@@ -1,5 +1,7 @@
 import express from 'express'
 import cors from 'cors'
+import fs from 'fs'
+import path from 'path'
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -7,6 +9,74 @@ const port = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json())
 
+// 数据文件路径配置
+const DATA_DIR = 'D:/data/baiwancheli'
+const DATA_FILES = {
+  members: path.join(DATA_DIR, 'members.json'),
+  rechargeRecords: path.join(DATA_DIR, 'recharge-records.json'),
+  consumptionRecords: path.join(DATA_DIR, 'consumption-records.json')
+}
+
+// 确保数据目录存在
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true })
+}
+
+// 默认数据
+const defaultData = {
+  members: [],
+  rechargeRecords: [],
+  consumptionRecords: []
+}
+
+// 读取指定类型的数据文件
+const readData = (type) => {
+  try {
+    const filePath = DATA_FILES[type]
+    if (!filePath) {
+      console.error(`未知数据类型: ${type}`)
+      return []
+    }
+    
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf-8')
+      return JSON.parse(data)
+    }
+    // 如果文件不存在，创建空数组
+    writeData(type, [])
+    return []
+  } catch (error) {
+    console.error(`读取${type}数据文件失败:`, error)
+    return []
+  }
+}
+
+// 写入指定类型的数据文件
+const writeData = (type, data) => {
+  try {
+    const filePath = DATA_FILES[type]
+    if (!filePath) {
+      console.error(`未知数据类型: ${type}`)
+      return
+    }
+    
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+  } catch (error) {
+    console.error(`写入${type}数据文件失败:`, error)
+    throw error
+  }
+}
+
+// 读取所有数据（用于初始化）
+const readAllData = () => {
+  return {
+    members: readData('members'),
+    rechargeRecords: readData('rechargeRecords'),
+    consumptionRecords: readData('consumptionRecords')
+  }
+}
+
+// ========== 登录接口 ==========
 const validUser = {
   username: 'admin',
   password: '123456',
@@ -22,10 +92,166 @@ app.post('/api/login', (req, res) => {
   return res.status(401).json({ success: false, message: '用户名或密码错误' })
 })
 
-app.get('/api/health', (_, res) => {
-  res.json({ ok: true })
+// ========== 会员管理接口 ==========
+
+// 获取所有会员
+app.get('/api/members', (req, res) => {
+  try {
+    const members = readData('members')
+    res.json({ success: true, data: members })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取会员列表失败' })
+  }
 })
 
+// 添加会员
+app.post('/api/members', (req, res) => {
+  try {
+    const members = readData('members')
+    const newMember = req.body
+    
+    // 检查手机号是否已存在
+    const existingMember = members.find(m => m.phone === newMember.phone)
+    if (existingMember) {
+      return res.status(400).json({ success: false, message: '该手机号已办理会员卡' })
+    }
+    
+    // 生成唯一ID
+    newMember.id = Date.now()
+    newMember.createTime = new Date().toISOString().replace('T', ' ').split('.')[0]
+    
+    members.push(newMember)
+    writeData('members', members)
+    
+    res.json({ success: true, data: newMember })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '添加会员失败' })
+  }
+})
+
+// 更新会员
+app.put('/api/members/:phone', (req, res) => {
+  try {
+    const members = readData('members')
+    const { phone } = req.params
+    const updates = req.body
+    
+    const memberIndex = members.findIndex(m => m.phone === phone)
+    if (memberIndex === -1) {
+      return res.status(404).json({ success: false, message: '会员不存在' })
+    }
+    
+    // 更新会员信息
+    members[memberIndex] = {
+      ...members[memberIndex],
+      ...updates,
+      phone // 保持手机号不变
+    }
+    
+    writeData('members', members)
+    res.json({ success: true, data: members[memberIndex] })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '更新会员失败' })
+  }
+})
+
+// 删除会员
+app.delete('/api/members/:phone', (req, res) => {
+  try {
+    const members = readData('members')
+    const { phone } = req.params
+    
+    const memberIndex = members.findIndex(m => m.phone === phone)
+    if (memberIndex === -1) {
+      return res.status(404).json({ success: false, message: '会员不存在' })
+    }
+    
+    members.splice(memberIndex, 1)
+    writeData('members', members)
+    
+    res.json({ success: true, message: '删除成功' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '删除会员失败' })
+  }
+})
+
+// ========== 充值记录接口 ==========
+
+// 获取充值记录
+app.get('/api/recharge-records', (req, res) => {
+  try {
+    const records = readData('rechargeRecords')
+    res.json({ success: true, data: records })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取充值记录失败' })
+  }
+})
+
+// 添加充值记录
+app.post('/api/recharge-records', (req, res) => {
+  try {
+    const records = readData('rechargeRecords')
+    const newRecord = req.body
+    
+    newRecord.id = Date.now()
+    newRecord.date = new Date().toISOString().replace('T', ' ').split('.')[0]
+    
+    records.push(newRecord)
+    writeData('rechargeRecords', records)
+    
+    res.json({ success: true, data: newRecord })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '添加充值记录失败' })
+  }
+})
+
+// ========== 消费记录接口 ==========
+
+// 获取消费记录
+app.get('/api/consumption-records', (req, res) => {
+  try {
+    const records = readData('consumptionRecords')
+    res.json({ success: true, data: records })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取消费记录失败' })
+  }
+})
+
+// 添加消费记录
+app.post('/api/consumption-records', (req, res) => {
+  try {
+    const records = readData('consumptionRecords')
+    const newRecord = req.body
+    
+    newRecord.id = Date.now()
+    newRecord.date = new Date().toISOString().replace('T', ' ').split('.')[0]
+    
+    records.push(newRecord)
+    writeData('consumptionRecords', records)
+    
+    res.json({ success: true, data: newRecord })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '添加消费记录失败' })
+  }
+})
+
+// ========== 健康检查 ==========
+app.get('/api/health', (_, res) => {
+  res.json({ 
+    ok: true,
+    dataFiles: {
+      members: DATA_FILES.members,
+      rechargeRecords: DATA_FILES.rechargeRecords,
+      consumptionRecords: DATA_FILES.consumptionRecords
+    }
+  })
+})
+
+// 启动服务
 app.listen(port, () => {
-  console.log(`Auth service listening at http://localhost:${port}`)
+  console.log(`Server listening at http://localhost:${port}`)
+  console.log('\n数据文件路径:')
+  console.log(`  会员数据: ${DATA_FILES.members}`)
+  console.log(`  充值记录: ${DATA_FILES.rechargeRecords}`)
+  console.log(`  消费记录: ${DATA_FILES.consumptionRecords}`)
 })
