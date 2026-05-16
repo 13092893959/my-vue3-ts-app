@@ -16,7 +16,16 @@
         <div class="cards-area">
           <div class="cards-grid">
             <div v-for="card in cards" :key="card.id" class="card-col">
-              <CardComponent :card="card" @settle="removeCard" />
+              <CardComponent 
+                :card="card" 
+                @start="startCardTimer" 
+                @share="shareTable" 
+                @orders="viewOrders"
+                @booking="bookingTable"
+                @edit="editCard"
+                @disable="disableCard"
+                @enable="enableCard"
+              />
             </div>
           </div>
         </div>
@@ -24,9 +33,10 @@
 
       <el-dialog
         v-model="showForm"
-        title="新增桌台"
+        :title="isEditMode ? '编辑桌台' : '新增桌台'"
         width="500px"
         @close="resetForm"
+        @opened="handleDialogOpened"
       >
         <el-form
           ref="formRef"
@@ -35,7 +45,11 @@
           label-width="100px"
         >
           <el-form-item label="桌台编号" prop="tableCode">
-            <el-input v-model="formData.tableCode" autocomplete="off" />
+            <el-input 
+              v-model="formData.tableCode" 
+              autocomplete="off" 
+              :placeholder="'请输入桌台编号'"
+            />
           </el-form-item>
           <el-form-item label="娱乐类型" prop="entertainment">
             <el-checkbox-group v-model="formData.entertainment">
@@ -115,6 +129,8 @@ const STORAGE_KEY = "card-manager-cards"
 const cards = ref<any[]>([])
 const showForm = ref(false)
 const loading = ref(false)
+const isEditMode = ref(false) // 是否为编辑模式
+const originalTableCode = ref("") // 记录原始桌台编号
 const formRef = ref<FormInstance>()
 const formData = ref({
   tableCode: "",
@@ -221,6 +237,10 @@ const createDefaultCards = () => {
     allowBooking: true,
     description: "",
     currentUsers: 0,
+    isInUse: false,
+    isBooked: false,
+    bookingInfo: null,
+    isDisabled: false,
   }))
 }
 
@@ -231,24 +251,62 @@ const submitForm = async () => {
     if (valid) {
       loading.value = true
       try {
-        if (cards.value.some((card) => card.id === formData.value.tableCode)) {
-          ElMessage.error("桌台编号已存在，请修改后重试")
-          return
-        }
+        if (isEditMode.value) {
+          // 编辑模式：更新现有卡片
+          const cardIndex = cards.value.findIndex(c => c.id === originalTableCode.value)
+          
+          if (cardIndex !== -1) {
+            // 如果编号被修改了，检查新编号是否与其他卡片冲突
+            if (formData.value.tableCode !== originalTableCode.value) {
+              const duplicateCard = cards.value.find(card => card.id === formData.value.tableCode)
+              if (duplicateCard) {
+                ElMessage.error("桌台编号已存在，请修改后重试")
+                return
+              }
+            }
+            
+            // 更新卡片信息（包括可能的新编号）
+            cards.value[cardIndex] = {
+              ...cards.value[cardIndex],
+              id: formData.value.tableCode,
+              type: formData.value.type,
+              entertainments: formData.value.entertainment,
+              level: formData.value.level,
+              capacity: formData.value.capacity,
+              minBooking: formData.value.minBooking,
+              isShared: formData.value.isShared,
+              allowBooking: formData.value.allowBooking,
+              description: formData.value.description,
+            }
+            
+            ElMessage.success("桌台信息已更新")
+          }
+        } else {
+          // 新增模式：检查编号是否存在
+          if (cards.value.some((card) => card.id === formData.value.tableCode)) {
+            ElMessage.error("桌台编号已存在，请修改后重试")
+            return
+          }
 
-        cards.value.push({
-          id: formData.value.tableCode,
-          status: "空闲",
-          type: formData.value.type,
-          entertainments: formData.value.entertainment,
-          level: formData.value.level,
-          capacity: formData.value.capacity,
-          minBooking: formData.value.minBooking,
-          isShared: formData.value.isShared,
-          allowBooking: formData.value.allowBooking,
-          description: formData.value.description,
-          currentUsers: 0,
-        })
+          cards.value.push({
+            id: formData.value.tableCode,
+            status: "空闲",
+            type: formData.value.type,
+            entertainments: formData.value.entertainment,
+            level: formData.value.level,
+            capacity: formData.value.capacity,
+            minBooking: formData.value.minBooking,
+            isShared: formData.value.isShared,
+            allowBooking: formData.value.allowBooking,
+            description: formData.value.description,
+            currentUsers: 0,
+            isInUse: false,
+            isBooked: false,
+            bookingInfo: null,
+            isDisabled: false,
+          })
+          ElMessage.success("桌台添加成功")
+        }
         showForm.value = false
         resetForm()
       } finally {
@@ -259,6 +317,8 @@ const submitForm = async () => {
 }
 
 const resetForm = () => {
+  isEditMode.value = false // 重置编辑模式
+  originalTableCode.value = "" // 重置原始桌台编号
   formData.value = {
     tableCode: "",
     entertainment: ["桌游"],
@@ -273,8 +333,101 @@ const resetForm = () => {
   formRef.value?.clearValidate()
 }
 
+const handleDialogOpened = () => {
+  // 对话框打开时的处理
+  if (!isEditMode.value) {
+    // 新增模式，确保表单是干净的
+    resetForm()
+  }
+}
+
 const removeCard = (id: string) => {
   cards.value = cards.value.filter((card) => card.id !== id)
+}
+
+const startCardTimer = (id: string, minutes: number) => {
+  const card = cards.value.find(c => c.id === id)
+  if (card) {
+    card.isInUse = true
+    card.isBooked = false
+    card.bookingInfo = null
+    card.status = "使用中"
+    card.currentUsers = 1
+    card.endTimestamp = Date.now() + minutes * 60 * 1000
+    card.initialMinutes = minutes
+    ElMessage.success(`卡片 ${id} 开始计时，时长 ${minutes} 分钟`)
+  }
+}
+
+const settleCard = (id: string) => {
+  const card = cards.value.find(c => c.id === id)
+  if (card) {
+    card.isInUse = false
+    card.isBooked = false
+    card.bookingInfo = null
+    card.status = "空闲"
+    card.currentUsers = 0
+    card.endTimestamp = undefined
+    card.initialMinutes = undefined
+    ElMessage.success(`卡片 ${id} 已结算`)
+  }
+}
+
+const shareTable = (id: string) => {
+  ElMessage.info(`卡片 ${id} 拼桌功能`)
+}
+
+const viewOrders = (id: string) => {
+  ElMessage.info(`卡片 ${id} 订单功能`)
+}
+
+const bookingTable = (id: string, bookingData: any) => {
+  const card = cards.value.find(c => c.id === id)
+  if (card) {
+    card.isBooked = true
+    card.bookingInfo = {
+      bookingUsers: bookingData.bookingUsers,
+      bookingTime: bookingData.bookingTime,
+      phone: bookingData.phone,
+    }
+    ElMessage.success(`预约成功！桌台 ${id}，人数 ${bookingData.bookingUsers} 人`)
+  }
+}
+
+const editCard = (id: string) => {
+  const card = cards.value.find(c => c.id === id)
+  if (card) {
+    isEditMode.value = true // 设置为编辑模式
+    originalTableCode.value = card.id // 记录原始桌台编号
+    formData.value = {
+      tableCode: card.id,
+      entertainment: [...card.entertainments],
+      type: card.type,
+      level: card.level,
+      capacity: card.capacity,
+      minBooking: card.minBooking,
+      isShared: card.isShared,
+      allowBooking: card.allowBooking,
+      description: card.description || "",
+    }
+    showForm.value = true
+  }
+}
+
+const disableCard = (id: string) => {
+  const card = cards.value.find(c => c.id === id)
+  if (card) {
+    card.isDisabled = true
+    ElMessage.warning(`卡片 ${id} 已禁用`)
+  }
+}
+
+const enableCard = (id: string) => {
+  const card = cards.value.find(c => c.id === id)
+  if (card) {
+    card.isDisabled = false
+    ElMessage.success(`卡片 ${id} 已启用`)
+  }
 }
 
 const logout = () => {
@@ -296,7 +449,7 @@ watch(cards, saveCards, { deep: true })
 .content-area {
   width: 100%;
   height: 100%;
-  padding: 28px 32px;
+  padding: 20px 24px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -310,8 +463,8 @@ watch(cards, saveCards, { deep: true })
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  margin-bottom: 28px;
-  gap: 16px;
+  margin-bottom: 20px;
+  gap: 12px;
   flex: 0 0 auto;
 }
 
@@ -324,7 +477,7 @@ watch(cards, saveCards, { deep: true })
 .content-card {
   flex: 1 1 auto;
   min-height: 0;
-  padding: 24px;
+  padding: 16px;
   background: transparent;
   border-radius: 24px;
   box-shadow: none;
@@ -338,15 +491,15 @@ watch(cards, saveCards, { deep: true })
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   justify-content: start;
-  gap: 36px;
-  align-items: start;
+  gap: 24px;
+  align-items: stretch;
 }
 
 .card-col {
   display: flex;
-  justify-content: center;
+  align-items: stretch;
 }
 
 .unit {
