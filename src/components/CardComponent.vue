@@ -1,11 +1,11 @@
 <template>
-  <el-card 
-    class="card" 
-    :class="{ 
-      'card-idle': !card.isInUse && !card.isBooked && !card.isDisabled, 
+  <el-card
+    class="card"
+    :class="{
+      'card-idle': !card.isInUse && !card.isBooked && !card.isDisabled,
       'card-in-use': card.isInUse,
       'card-booked': card.isBooked && !card.isInUse,
-      'card-disabled': card.isDisabled
+      'card-disabled': card.isDisabled,
     }"
     shadow="hover"
     @click="handleCardClick"
@@ -14,36 +14,26 @@
     <template #header>
       <div class="card-header">
         <span class="card-code">{{ card.id }}</span>
-        <el-tag 
-          v-if="card.isDisabled"
-          type="info" 
-          size="small" 
-          effect="light"
-        >
+        <el-tag v-if="card.isDisabled" type="info" size="small" effect="light">
           已禁用
         </el-tag>
-        <el-tag 
-          v-else-if="card.isInUse" 
-          type="danger" 
-          size="small" 
+        <el-tag
+          v-else-if="card.isInUse"
+          type="danger"
+          size="small"
           effect="light"
         >
           使用中
         </el-tag>
-        <el-tag 
-          v-else-if="card.isBooked" 
-          type="warning" 
-          size="small" 
+        <el-tag
+          v-else-if="card.isBooked"
+          type="warning"
+          size="small"
           effect="light"
         >
           已预约
         </el-tag>
-        <el-tag 
-          v-else 
-          type="success" 
-          size="small" 
-          effect="light"
-        >
+        <el-tag v-else type="success" size="small" effect="light">
           空桌
         </el-tag>
       </div>
@@ -58,27 +48,38 @@
     </div>
 
     <!-- 预约标识 -->
-    <div v-if="card.isBooked && !card.isInUse" class="booking-badge">
+    <!-- <div v-if="card.isBooked && !card.isInUse" class="booking-badge">
       <el-icon><Bell /></el-icon>
       <span>预约</span>
-    </div>
+    </div> -->
 
     <!-- 使用中模式：显示计时器 -->
     <div v-if="card.isInUse" class="timer-banner">
       <div class="timer-title">计时中</div>
-      <div class="timer-value">{{ formatTime(Math.abs(remainingTime)) }}</div>
+      <div class="timer-value">{{ formatTime(elapsedTime) }}</div>
       <div class="timer-sub">{{ card.currentUsers }}人</div>
+      <div class="timer-entertainment" v-if="card.currentEntertainment">
+        {{ card.currentEntertainment }}
+      </div>
+      <div class="timer-start-time" v-if="card.startTimestamp">
+        开始：{{ formatStartTime(card.startTimestamp) }}
+      </div>
     </div>
 
     <!-- 预约信息展示 -->
-    <div v-if="card.isBooked && !card.isInUse && card.bookingInfo" class="booking-info">
+    <div
+      v-if="card.isBooked && !card.isInUse && card.bookingInfo"
+      class="booking-info"
+    >
       <div class="booking-info-item">
         <span class="info-label">预约人数</span>
         <span class="info-value">{{ card.bookingInfo.bookingUsers }}人</span>
       </div>
       <div class="booking-info-item">
         <span class="info-label">预约时间</span>
-        <span class="info-value">{{ formatDate(card.bookingInfo.bookingTime) }}</span>
+        <span class="info-value">{{
+          formatDate(card.bookingInfo.bookingTime)
+        }}</span>
       </div>
       <div class="booking-info-item">
         <span class="info-label">联系电话</span>
@@ -89,17 +90,19 @@
     <!-- 基本信息 -->
     <div class="card-info">
       <div class="info-item">
-        <span class="info-label">楼层</span>
-        <span class="info-value">{{ card.level }}楼F</span>
-      </div>
-      <div class="info-item">
         <span class="info-label">类型</span>
         <span class="info-value">{{ card.type }}</span>
       </div>
       <div class="info-item">
         <span class="info-label">娱乐</span>
         <span class="info-value">
-          <el-tag v-for="item in card.entertainments" :key="item" size="small" type="primary" effect="light">
+          <el-tag
+            v-for="item in card.entertainments"
+            :key="item"
+            size="small"
+            type="primary"
+            effect="light"
+          >
             {{ item }}
           </el-tag>
         </span>
@@ -114,18 +117,26 @@
     <template #footer>
       <!-- 空闲模式：开始计时按钮 -->
       <div v-if="!card.isInUse" class="action-row-idle">
-        <el-button type="primary" size="large" @click.stop="showTimerDialog = true" class="btn-start">
+        <el-button
+          type="primary"
+          size="large"
+          @click.stop="showTimerDialog = true"
+          class="btn-start"
+        >
           开始计时
         </el-button>
       </div>
-      
-      <!-- 使用中模式：拼桌和订单按钮 -->
+
+      <!-- 使用中模式：拼桌、订单和结束计时按钮 -->
       <div v-else class="action-row-in-use">
         <el-button type="success" size="default" @click.stop="shareTable">
           拼桌
         </el-button>
         <el-button type="info" size="default" @click.stop="viewOrders">
           订单
+        </el-button>
+        <el-button type="danger" size="default" @click.stop="openSettleDialog">
+          结束计时
         </el-button>
       </div>
     </template>
@@ -134,28 +145,43 @@
   <!-- 开始计时对话框 -->
   <el-dialog
     v-model="showTimerDialog"
-    title="设置计时时间"
-    width="400px"
+    title="开始计时"
+    width="500px"
+    append-to-body
     @close="resetTimerForm"
   >
     <el-form :model="timerForm" label-width="100px">
-      <el-form-item label="计时时长">
+      <el-form-item label="娱乐类型">
+        <el-select
+          v-model="timerForm.entertainment"
+          placeholder="请选择娱乐类型"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="item in card.entertainments"
+            :key="item"
+            :label="item"
+            :value="item"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="人数">
         <el-input-number
-          v-model="timerForm.hours"
-          :min="0"
-          :max="23"
+          v-model="timerForm.currentUsers"
+          :min="1"
+          :max="card.capacity"
           controls-position="right"
-          style="width: 120px"
+          style="width: 100%"
         />
-        <span style="margin: 0 8px">小时</span>
-        <el-input-number
-          v-model="timerForm.minutes"
-          :min="0"
-          :max="59"
-          controls-position="right"
-          style="width: 120px"
+      </el-form-item>
+      <el-form-item label="开始时间">
+        <el-time-picker
+          v-model="timerForm.startTime"
+          placeholder="选择开始时间"
+          format="HH:mm:ss"
+          value-format="HH:mm:ss"
+          style="width: 100%"
         />
-        <span style="margin: 0 8px">分钟</span>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -164,16 +190,148 @@
     </template>
   </el-dialog>
 
+  <!-- 结算确认对话框 -->
+  <el-dialog
+    v-model="showSettleDialog"
+    title="结束计时 - 订单结算"
+    width="600px"
+    append-to-body
+  >
+    <div class="settle-info">
+      <div class="settle-item">
+        <span class="settle-label">桌台编号</span>
+        <span class="settle-value">{{ card.id }}</span>
+      </div>
+      <div class="settle-item">
+        <span class="settle-label">娱乐类型</span>
+        <span class="settle-value">{{ card.currentEntertainment || "-" }}</span>
+      </div>
+      <div class="settle-item">
+        <span class="settle-label">人数</span>
+        <span class="settle-value">{{ card.currentUsers }}人</span>
+      </div>
+      <div class="settle-item">
+        <span class="settle-label">开始时间</span>
+        <span class="settle-value">{{
+          formatStartTime(card.startTimestamp)
+        }}</span>
+      </div>
+      <div class="settle-item">
+        <span class="settle-label">结束时间</span>
+        <span class="settle-value">{{ formatTimeNow() }}</span>
+      </div>
+      <div class="settle-item highlight">
+        <span class="settle-label">总时长</span>
+        <span class="settle-value">{{ formatTime(elapsedTime) }}</span>
+      </div>
+      <div class="settle-item">
+        <span class="settle-label">计费时长</span>
+        <span class="settle-value">{{ calculateBillableHours() }}小时</span>
+      </div>
+
+      <!-- 会员信息区域 -->
+      <el-divider>会员信息</el-divider>
+      <el-form :model="settleForm" label-width="100px" style="margin-top: 16px">
+        <el-form-item label="关联会员">
+          <el-select
+            v-model="settleForm.memberPhone"
+            placeholder="选择会员（可选）"
+            filterable
+            clearable
+            style="width: 100%"
+            @change="handleMemberSelect"
+          >
+            <el-option
+              v-for="member in availableMembers"
+              :key="member.phone"
+              :label="`${member.name} (${member.phone})`"
+              :value="member.phone"
+            >
+              <span>{{ member.name }}</span>
+              <span style="float: right; color: #8492a6; font-size: 13px">
+                {{
+                  member.cardType === "充值卡"
+                    ? `余额: ¥${(member.balance || 0).toFixed(2)}`
+                    : `剩余: ${member.remainingTimes}次`
+                }}
+              </span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <!-- 显示会员余额/次数信息 -->
+        <el-alert
+          v-if="selectedMember"
+          :title="getMemberBalanceInfo()"
+          type="info"
+          :closable="false"
+          style="margin-bottom: 16px"
+        />
+
+        <el-form-item label="单价(元/小时)">
+          <el-input-number
+            v-model="settleForm.pricePerHour"
+            :min="0"
+            :precision="2"
+            :step="1"
+            controls-position="right"
+            style="width: 100%"
+            @change="calculateFinalAmount"
+          />
+        </el-form-item>
+        <el-form-item label="折扣">
+          <el-input-number
+            v-model="settleForm.discount"
+            :min="0"
+            :max="100"
+            :precision="0"
+            :step="5"
+            controls-position="right"
+            style="width: 100%"
+            @change="calculateFinalAmount"
+          >
+            <template #append>%</template>
+          </el-input-number>
+        </el-form-item>
+        <el-form-item label="支付方式">
+          <el-radio-group v-model="settleForm.paymentMethod">
+            <el-radio label="member_balance" :disabled="!canUseMemberBalance">
+              会员余额
+            </el-radio>
+            <el-radio label="wechat">微信支付</el-radio>
+            <el-radio label="alipay">支付宝</el-radio>
+            <el-radio label="cash">现金</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <div class="settle-item highlight final-price">
+        <span class="settle-label">应付金额</span>
+        <span class="settle-value price"
+          >¥{{ settleForm.finalAmount.toFixed(2) }}</span
+        >
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="showSettleDialog = false">取消</el-button>
+      <el-button type="danger" @click="confirmSettle">确认结算</el-button>
+    </template>
+  </el-dialog>
+
   <!-- 桌台详情对话框 -->
   <el-dialog
     v-model="showDetailDialog"
     title="桌台详情"
     width="700px"
+    append-to-body
   >
     <div class="detail-header">
-      <h2 class="detail-title">{{ card.level }}楼F-{{ card.id }}</h2>
-      <el-tag :type="card.isInUse ? 'danger' : (card.isBooked ? 'warning' : 'success')" size="large" effect="light">
-        {{ card.isInUse ? "使用中" : (card.isBooked ? "已预约" : "空桌") }}
+      <h2 class="detail-title">{{ card.id }}</h2>
+      <el-tag
+        :type="card.isInUse ? 'danger' : card.isBooked ? 'warning' : 'success'"
+        size="large"
+        effect="light"
+      >
+        {{ card.isInUse ? "使用中" : card.isBooked ? "已预约" : "空桌" }}
       </el-tag>
     </div>
 
@@ -183,9 +341,6 @@
       <el-descriptions :column="2" border>
         <el-descriptions-item label="桌台类型">
           {{ card.type }}
-        </el-descriptions-item>
-        <el-descriptions-item label="楼层">
-          {{ card.level }}楼F
         </el-descriptions-item>
         <el-descriptions-item label="最大人数">
           {{ card.capacity }}人
@@ -205,7 +360,11 @@
         </el-descriptions-item>
         <el-descriptions-item label="娱乐类型" :span="2">
           <el-space wrap>
-            <el-tag v-for="item in card.entertainments" :key="item" size="small">
+            <el-tag
+              v-for="item in card.entertainments"
+              :key="item"
+              size="small"
+            >
               {{ item }}
             </el-tag>
           </el-space>
@@ -233,12 +392,80 @@
     </div>
 
     <div class="detail-actions">
-      <el-button v-if="!card.isInUse && !card.isDisabled" type="primary" @click="handleStartFromDetail">开始计时</el-button>
-      <el-button v-if="!card.isDisabled" type="warning" @click="handleBooking">预约</el-button>
-      <el-button v-if="!card.isDisabled" type="edit" @click="handleEdit">编辑</el-button>
-      <el-button v-if="!card.isDisabled" type="danger" @click="handleDisable">禁用</el-button>
-      <el-button v-if="card.isDisabled" type="success" @click="handleEnable">启用</el-button>
+      <el-button
+        v-if="!card.isInUse && !card.isDisabled"
+        type="primary"
+        @click="handleStartFromDetail"
+        >开始计时</el-button
+      >
+      <el-button v-if="!card.isDisabled" type="warning" @click="handleBooking"
+        >预约</el-button
+      >
+      <el-button v-if="!card.isDisabled" type="edit" @click="handleEdit"
+        >编辑</el-button
+      >
+      <el-button v-if="!card.isDisabled" type="danger" @click="handleDisable"
+        >禁用</el-button
+      >
+      <el-button v-if="card.isDisabled" type="success" @click="handleEnable"
+        >启用</el-button
+      >
     </div>
+  </el-dialog>
+
+  <!-- 订单详情对话框 -->
+  <el-dialog
+    v-model="showOrdersDialog"
+    title="订单记录"
+    width="800px"
+    append-to-body
+  >
+    <el-table :data="tableOrders" style="width: 100%" max-height="400">
+      <el-table-column prop="id" label="订单ID" width="150" />
+      <el-table-column prop="entertainment" label="娱乐类型" width="100" />
+      <el-table-column prop="users" label="人数" width="60" align="center" />
+      <el-table-column label="状态" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag
+            :type="row.status === 'completed' ? 'success' : 'warning'"
+            size="small"
+          >
+            {{ row.status === "completed" ? "已完成" : "进行中" }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="开始时间" width="160">
+        <template #default="{ row }">
+          {{ formatStartTime(row.startTime) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="结束时间" width="160">
+        <template #default="{ row }">
+          {{ row.endTime ? formatStartTime(row.endTime) : "-" }}
+        </template>
+      </el-table-column>
+      <el-table-column
+        prop="duration"
+        label="时长(分钟)"
+        width="100"
+        align="center"
+      />
+      <el-table-column label="金额" width="100" align="right">
+        <template #default="{ row }">
+          <span class="price-text"
+            >¥{{ row.amount ? row.amount.toFixed(2) : "-" }}</span
+          >
+        </template>
+      </el-table-column>
+      <el-table-column label="创建时间" width="160">
+        <template #default="{ row }">
+          {{ formatDateTime(row.createTime) }}
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #footer>
+      <el-button @click="showOrdersDialog = false">关闭</el-button>
+    </template>
   </el-dialog>
 
   <!-- 预约对话框 -->
@@ -246,6 +473,7 @@
     v-model="showBookingDialog"
     title="预约桌台"
     width="500px"
+    append-to-body
     @close="resetBookingForm"
   >
     <el-form
@@ -291,10 +519,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted, watch } from "vue"
+import { ref, onUnmounted, watch, computed } from "vue"
 import { ElMessage, ElMessageBox } from "element-plus"
 import type { FormInstance, FormRules } from "element-plus"
-import { Bell, Lock } from '@element-plus/icons-vue'
+import { Bell, Lock } from "@element-plus/icons-vue"
 
 defineOptions({
   name: "CardComponent",
@@ -319,15 +547,35 @@ type CardProps = {
     endTimestamp?: number
     initialMinutes?: number
     bookingInfo?: any
+    startTimestamp?: number | null // 开始计时的时间戳
+    currentEntertainment?: string // 当前选择的娱乐类型（单选）
   }
 }
 
 const props = defineProps<CardProps>()
-const emit = defineEmits<{ 
-  (e: "start", id: string, minutes: number): void
+const emit = defineEmits<{
+  (
+    e: "start",
+    id: string,
+    data: {
+      entertainment: string
+      currentUsers: number
+      startTimestamp: number
+    },
+  ): void
   (e: "share", id: string): void
   (e: "orders", id: string): void
-  (e: "settle", id: string): void
+  (
+    e: "settle",
+    id: string,
+    settleData: {
+      pricePerHour: number
+      discount: number
+      finalAmount: number
+      memberPhone?: string
+      paymentMethod?: string
+    },
+  ): void
   (e: "booking", id: string, bookingData: any): void
   (e: "edit", id: string): void
   (e: "disable", id: string): void
@@ -335,17 +583,75 @@ const emit = defineEmits<{
 }>()
 
 const remainingTime = ref(0)
+const elapsedTime = ref(0) // 正计时的 elapsed time
 let timer: number | null = null
+
+const getElapsedSeconds = () => {
+  if (props.card.startTimestamp) {
+    return Math.round((Date.now() - props.card.startTimestamp) / 1000)
+  }
+  return 0
+}
+
+const updateElapsed = () => {
+  elapsedTime.value = getElapsedSeconds()
+}
+
+const initTimer = () => {
+  updateElapsed()
+  if (timer) clearInterval(timer)
+  timer = window.setInterval(updateElapsed, 1000)
+}
+
+const stopTimer = () => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
+// 监听 isInUse 和 startTimestamp 变化以启动/停止计时器
+watch(
+  () => [props.card.isInUse, props.card.startTimestamp],
+  ([isInUse]) => {
+    if (isInUse) {
+      initTimer()
+    } else {
+      stopTimer()
+      elapsedTime.value = 0
+    }
+  },
+  { immediate: true },
+)
 
 // 对话框状态
 const showTimerDialog = ref(false)
 const showDetailDialog = ref(false)
 const showBookingDialog = ref(false)
+const showSettleDialog = ref(false) // 结算确认对话框
+const showOrdersDialog = ref(false) // 订单详情对话框
+
+// 订单列表
+const tableOrders = ref<any[]>([])
+
+// 结算表单
+const settleForm = ref({
+  pricePerHour: 30, // 默认单价30元/小时
+  discount: 100, // 默认100%（无折扣）
+  finalAmount: 0, // 最终金额
+  memberPhone: "", // 会员手机号
+  paymentMethod: "cash", // 支付方式：member_balance/wechat/alipay/cash
+})
+
+// 可用会员列表
+const availableMembers = ref<any[]>([])
+const selectedMember = ref<any>(null)
 
 // 计时表单
 const timerForm = ref({
-  hours: 0,
-  minutes: 60,
+  entertainment: "",
+  currentUsers: 1,
+  startTime: "",
 })
 
 // 预约表单
@@ -378,50 +684,13 @@ const bookingRules = ref<FormRules>({
   ],
   phone: [
     { required: true, message: "请输入预留手机号", trigger: "blur" },
-    { pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号", trigger: "blur" },
+    {
+      pattern: /^1[3-9]\d{9}$/,
+      message: "请输入正确的手机号",
+      trigger: "blur",
+    },
   ],
 })
-
-const getRemainingSeconds = () => {
-  if (props.card.endTimestamp) {
-    return Math.round((props.card.endTimestamp - Date.now()) / 1000)
-  }
-  if (props.card.initialMinutes) {
-    return props.card.initialMinutes * 60
-  }
-  return 0
-}
-
-const updateRemaining = () => {
-  remainingTime.value = getRemainingSeconds()
-}
-
-const initTimer = () => {
-  updateRemaining()
-  if (timer) clearInterval(timer)
-  timer = window.setInterval(updateRemaining, 1000)
-}
-
-const stopTimer = () => {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
-}
-
-// 监听 isInUse 和 endTimestamp 变化以启动/停止计时器
-watch(
-  () => [props.card.isInUse, props.card.endTimestamp],
-  ([isInUse]) => {
-    if (isInUse) {
-      initTimer()
-    } else {
-      stopTimer()
-      remainingTime.value = 0
-    }
-  },
-  { immediate: true }
-)
 
 // 点击卡片显示详情
 const handleCardClick = () => {
@@ -431,18 +700,38 @@ const handleCardClick = () => {
 
 const resetTimerForm = () => {
   timerForm.value = {
-    hours: 0,
-    minutes: 60,
+    entertainment: "",
+    currentUsers: 1,
+    startTime: "",
   }
 }
 
 const confirmStartTimer = () => {
-  const totalMinutes = timerForm.value.hours * 60 + timerForm.value.minutes
-  if (totalMinutes === 0) {
-    ElMessage.warning("请设置计时时间")
+  if (!timerForm.value.entertainment) {
+    ElMessage.warning("请选择娱乐类型")
     return
   }
-  emit("start", props.card.id, totalMinutes)
+
+  // 计算开始时间的时间戳
+  let startTimestamp: number
+  if (timerForm.value.startTime) {
+    // 如果选择了开始时间，使用选择的时间
+    const now = new Date()
+    const [hours, minutes, seconds] = timerForm.value.startTime
+      .split(":")
+      .map(Number)
+    now.setHours(hours, minutes, seconds, 0)
+    startTimestamp = now.getTime()
+  } else {
+    // 否则使用当前时间
+    startTimestamp = Date.now()
+  }
+
+  emit("start", props.card.id, {
+    entertainment: timerForm.value.entertainment,
+    currentUsers: timerForm.value.currentUsers,
+    startTimestamp: startTimestamp,
+  })
   showTimerDialog.value = false
   resetTimerForm()
 }
@@ -451,8 +740,51 @@ const shareTable = () => {
   emit("share", props.card.id)
 }
 
-const viewOrders = () => {
-  emit("orders", props.card.id)
+const viewOrders = async () => {
+  try {
+    // 调用后端API获取桌台的订单列表
+    const response = await fetch(
+      `http://localhost:3000/api/orders/table/${props.card.id}`,
+    )
+
+    if (!response.ok) {
+      throw new Error("网络响应错误")
+    }
+
+    const result = await response.json()
+
+    if (result.success) {
+      // 如果当前桌台正在使用中，添加当前进行中的订单到列表
+      let orders = result.data
+
+      if (props.card.isInUse && props.card.startTimestamp) {
+        const currentOrder = {
+          id: "CURRENT",
+          entertainment: props.card.currentEntertainment || "-",
+          users: props.card.currentUsers,
+          status: "in_progress",
+          startTime: props.card.startTimestamp,
+          endTime: null,
+          duration: Math.ceil(elapsedTime.value / 60),
+          amount: null,
+          createTime: new Date(props.card.startTimestamp).toISOString(),
+        }
+        orders = [currentOrder, ...orders]
+      }
+
+      tableOrders.value = orders
+      showOrdersDialog.value = true
+
+      if (orders.length === 0) {
+        ElMessage.info(`卡片 ${props.card.id} 暂无订单记录`)
+      }
+    } else {
+      ElMessage.error(result.message || "获取订单失败")
+    }
+  } catch (error) {
+    console.error("获取订单失败:", error)
+    ElMessage.warning("后端服务未启动或网络连接失败，请稍后重试")
+  }
 }
 
 const handleStartFromDetail = () => {
@@ -484,7 +816,7 @@ const resetBookingForm = () => {
 
 const confirmBooking = async () => {
   if (!bookingFormRef.value) return
-  
+
   await bookingFormRef.value.validate((valid) => {
     if (valid) {
       emit("booking", props.card.id, { ...bookingForm.value })
@@ -534,15 +866,141 @@ const formatTime = (seconds: number) => {
   return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
 }
 
+const formatStartTime = (timestamp: number | null | undefined) => {
+  if (!timestamp) return "-"
+  const d = new Date(timestamp)
+  const hours = String(d.getHours()).padStart(2, "0")
+  const minutes = String(d.getMinutes()).padStart(2, "0")
+  const seconds = String(d.getSeconds()).padStart(2, "0")
+  return `${hours}:${minutes}:${seconds}`
+}
+
 const formatDate = (date: Date | null) => {
-  if (!date) return '-'
+  if (!date) return "-"
   const d = new Date(date)
   const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hours = String(d.getHours()).padStart(2, '0')
-  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  const hours = String(d.getHours()).padStart(2, "0")
+  const minutes = String(d.getMinutes()).padStart(2, "0")
   return `${year}-${month}-${day} ${hours}:${minutes}`
+}
+
+const formatTimeNow = () => {
+  const now = new Date()
+  const hours = String(now.getHours()).padStart(2, "0")
+  const minutes = String(now.getMinutes()).padStart(2, "0")
+  const seconds = String(now.getSeconds()).padStart(2, "0")
+  return `${hours}:${minutes}:${seconds}`
+}
+
+const formatDateTime = (dateTime: string) => {
+  if (!dateTime) return "-"
+  const d = new Date(dateTime)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  const hours = String(d.getHours()).padStart(2, "0")
+  const minutes = String(d.getMinutes()).padStart(2, "0")
+  return `${year}-${month}-${day} ${hours}:${minutes}`
+}
+
+// 计算金额（简单计费规则：每小时30元）
+const calculateAmount = () => {
+  const hours = elapsedTime.value / 3600
+  const amount = Math.ceil(hours * 30) // 每小时30元，向上取整
+  return amount.toFixed(2)
+}
+
+// 计算计费时长（小时），未满一小时按一小时计算
+const calculateBillableHours = () => {
+  const hours = elapsedTime.value / 3600
+  return Math.ceil(hours) // 向上取整
+}
+
+// 计算最终金额
+const calculateFinalAmount = () => {
+  const billableHours = calculateBillableHours()
+  const baseAmount = billableHours * settleForm.value.pricePerHour
+  const discountRate = settleForm.value.discount / 100
+  settleForm.value.finalAmount = baseAmount * discountRate
+}
+
+// 打开结算对话框并初始化计算
+const openSettleDialog = async () => {
+  // 重置表单为默认值
+  settleForm.value.pricePerHour = 30
+  settleForm.value.discount = 100
+  settleForm.value.memberPhone = ""
+  settleForm.value.paymentMethod = "cash"
+  selectedMember.value = null
+  // 立即计算最终金额
+  calculateFinalAmount()
+  // 加载会员列表
+  await loadMembers()
+  // 打开对话框
+  showSettleDialog.value = true
+}
+
+// 加载会员列表
+const loadMembers = async () => {
+  try {
+    const response = await fetch("http://localhost:3000/api/members")
+    const result = await response.json()
+    if (result.success) {
+      availableMembers.value = result.data
+    }
+  } catch (error) {
+    console.error("加载会员列表失败:", error)
+  }
+}
+
+// 会员选择变化
+const handleMemberSelect = (phone: string) => {
+  selectedMember.value =
+    availableMembers.value.find((m) => m.phone === phone) || null
+  // 如果选择了会员且有余额/次数，默认使用会员支付
+  if (selectedMember.value && canUseMemberBalance.value) {
+    settleForm.value.paymentMethod = "member_balance"
+  } else {
+    settleForm.value.paymentMethod = "cash"
+  }
+}
+
+// 获取会员余额信息
+const getMemberBalanceInfo = () => {
+  if (!selectedMember.value) return ""
+  const member = selectedMember.value
+  if (member.cardType === "充值卡") {
+    return `当前余额：¥${(member.balance || 0).toFixed(2)}`
+  } else if (member.cardType === "次卡") {
+    return `剩余次数：${member.remainingTimes || 0}次`
+  }
+  return ""
+}
+
+// 是否可以使用会员余额
+const canUseMemberBalance = computed(() => {
+  if (!selectedMember.value) return false
+  const member = selectedMember.value
+  if (member.cardType === "充值卡") {
+    return (member.balance || 0) >= settleForm.value.finalAmount
+  } else if (member.cardType === "次卡") {
+    return (member.remainingTimes || 0) > 0
+  }
+  return false
+})
+
+const confirmSettle = () => {
+  // 触发父组件进行结算，传递结算信息
+  emit("settle", props.card.id, {
+    pricePerHour: settleForm.value.pricePerHour,
+    discount: settleForm.value.discount,
+    finalAmount: settleForm.value.finalAmount,
+    memberPhone: settleForm.value.memberPhone,
+    paymentMethod: settleForm.value.paymentMethod,
+  })
+  showSettleDialog.value = false
 }
 
 onUnmounted(() => {
@@ -687,7 +1145,7 @@ onUnmounted(() => {
   font-size: 30px;
   letter-spacing: 0.12em;
   font-weight: 700;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -697,6 +1155,71 @@ onUnmounted(() => {
   font-size: 13px;
   opacity: 0.9;
   line-height: 1;
+}
+
+.timer-entertainment {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.85;
+  line-height: 1;
+}
+
+.timer-start-time {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.85;
+  line-height: 1;
+}
+
+/* 结算对话框样式 */
+.settle-info {
+  padding: 20px 0;
+}
+
+.settle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.highlight {
+    background-color: #fff7e6;
+    margin: 8px -16px;
+    padding: 12px 16px;
+    border-radius: 4px;
+
+    &.final-price {
+      background-color: #fef0f0;
+      margin-top: 16px;
+    }
+  }
+}
+
+.settle-label {
+  font-size: 14px;
+  color: #666;
+}
+
+.settle-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+
+  &.price {
+    font-size: 24px;
+    color: #ff4d4f;
+    font-weight: 700;
+  }
+}
+
+.price-text {
+  color: #ff4d4f;
+  font-weight: 600;
 }
 
 .card-info {

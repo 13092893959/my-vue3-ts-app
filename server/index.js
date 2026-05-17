@@ -14,7 +14,9 @@ const DATA_DIR = 'D:/data/baiwancheli'
 const DATA_FILES = {
   members: path.join(DATA_DIR, 'members.json'),
   rechargeRecords: path.join(DATA_DIR, 'recharge-records.json'),
-  consumptionRecords: path.join(DATA_DIR, 'consumption-records.json')
+  consumptionRecords: path.join(DATA_DIR, 'consumption-records.json'),
+  tables: path.join(DATA_DIR, 'tables.json'),
+  orders: path.join(DATA_DIR, 'orders.json')
 }
 
 // 确保数据目录存在
@@ -26,7 +28,9 @@ if (!fs.existsSync(DATA_DIR)) {
 const defaultData = {
   members: [],
   rechargeRecords: [],
-  consumptionRecords: []
+  consumptionRecords: [],
+  tables: [],
+  orders: []
 }
 
 // 读取指定类型的数据文件
@@ -72,7 +76,9 @@ const readAllData = () => {
   return {
     members: readData('members'),
     rechargeRecords: readData('rechargeRecords'),
-    consumptionRecords: readData('consumptionRecords')
+    consumptionRecords: readData('consumptionRecords'),
+    tables: readData('tables'),
+    orders: readData('orders')
   }
 }
 
@@ -235,6 +241,77 @@ app.post('/api/consumption-records', (req, res) => {
   }
 })
 
+// ========== 桌台管理接口 ==========
+
+// 获取所有桌台
+app.get('/api/tables', (req, res) => {
+  try {
+    const tables = readData('tables')
+    res.json({ success: true, data: tables })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取桌台列表失败' })
+  }
+})
+
+// 保存所有桌台（用于批量更新）
+app.post('/api/tables', (req, res) => {
+  try {
+    const tables = req.body
+    writeData('tables', tables)
+    res.json({ success: true, data: tables })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '保存桌台数据失败' })
+  }
+})
+
+// ========== 订单管理接口 ==========
+
+// 获取所有订单
+app.get('/api/orders', (req, res) => {
+  try {
+    const orders = readData('orders')
+    res.json({ success: true, data: orders })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取订单列表失败' })
+  }
+})
+
+// 获取指定桌台的订单
+app.get('/api/orders/table/:tableId', (req, res) => {
+  try {
+    const { tableId } = req.params
+    const orders = readData('orders')
+    const tableOrders = orders.filter(order => order.tableId === tableId)
+    res.json({ success: true, data: tableOrders })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取桌台订单失败' })
+  }
+})
+
+// 创建订单
+app.post('/api/orders', (req, res) => {
+  try {
+    const newOrder = req.body
+    const orders = readData('orders')
+    
+    // 添加订单ID和创建时间
+    const order = {
+      ...newOrder,
+      id: `ORD${Date.now()}`,
+      createTime: new Date().toISOString(),
+      status: 'completed'
+    }
+    
+    orders.push(order)
+    writeData('orders', orders)
+    
+    res.json({ success: true, data: order })
+  } catch (error) {
+    console.error('创建订单失败:', error)
+    res.status(500).json({ success: false, message: '创建订单失败' })
+  }
+})
+
 // ========== 健康检查 ==========
 app.get('/api/health', (_, res) => {
   res.json({ 
@@ -242,7 +319,9 @@ app.get('/api/health', (_, res) => {
     dataFiles: {
       members: DATA_FILES.members,
       rechargeRecords: DATA_FILES.rechargeRecords,
-      consumptionRecords: DATA_FILES.consumptionRecords
+      consumptionRecords: DATA_FILES.consumptionRecords,
+      tables: DATA_FILES.tables,
+      orders: DATA_FILES.orders
     }
   })
 })
@@ -254,4 +333,6 @@ app.listen(port, () => {
   console.log(`  会员数据: ${DATA_FILES.members}`)
   console.log(`  充值记录: ${DATA_FILES.rechargeRecords}`)
   console.log(`  消费记录: ${DATA_FILES.consumptionRecords}`)
+  console.log(`  桌台数据: ${DATA_FILES.tables}`)
+  console.log(`  订单数据: ${DATA_FILES.orders}`)
 })

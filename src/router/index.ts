@@ -4,6 +4,9 @@ import HomePage from '../pages/HomePage.vue'
 import HomeMainPage from '../pages/HomeMainPage.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import MemberPage from '../pages/MemberPage.vue'
+import OrderPage from '../pages/OrderPage.vue'
+import RechargePage from '../pages/RechargePage.vue'
+import ConsumptionPage from '../pages/ConsumptionPage.vue'
 
 const routes = [
   {
@@ -31,6 +34,21 @@ const routes = [
         path: 'member',
         name: 'Member',
         component: MemberPage,
+      },
+      {
+        path: 'order',
+        name: 'Order',
+        component: OrderPage,
+      },
+      {
+        path: 'recharge',
+        name: 'Recharge',
+        component: RechargePage,
+      },
+      {
+        path: 'consumption',
+        name: 'Consumption',
+        component: ConsumptionPage,
       },
     ],
   },

@@ -20,6 +20,9 @@
             <span class="user-avatar"></span>
             <span class="user-name">管理员</span>
           </div>
+          <el-button type="danger" @click="logout" size="large" plain>
+            退出登录
+          </el-button>
         </div>
       </div>
     </header>
@@ -53,6 +56,18 @@
             <span class="menu-item-icon">👥</span>
             <span class="menu-item-text">会员管理</span>
           </el-menu-item>
+          <el-menu-item index="/home/order">
+            <span class="menu-item-icon">📋</span>
+            <span class="menu-item-text">订单管理</span>
+          </el-menu-item>
+          <el-menu-item index="/home/recharge">
+            <span class="menu-item-icon">💰</span>
+            <span class="menu-item-text">充值记录</span>
+          </el-menu-item>
+          <el-menu-item index="/home/consumption">
+            <span class="menu-item-icon">🛒</span>
+            <span class="menu-item-text">消费记录</span>
+          </el-menu-item>
         </el-menu>
       </aside>
 
@@ -64,25 +79,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, onMounted, onUnmounted } from "vue"
+import { useRoute, useRouter } from "vue-router"
+
+const router = useRouter()
 
 const route = useRoute()
 const activeRoute = computed(() => {
-  if (route.path === '/home') return '/home'
-  if (route.path.startsWith('/home/dashboard')) return '/home/dashboard'
-  if (route.path.startsWith('/home/member')) return '/home/member'
-  return '/home'
+  if (route.path === "/home") return "/home"
+  if (route.path.startsWith("/home/dashboard")) return "/home/dashboard"
+  if (route.path.startsWith("/home/member")) return "/home/member"
+  if (route.path.startsWith("/home/order")) return "/home/order"
+  if (route.path.startsWith("/home/recharge")) return "/home/recharge"
+  if (route.path.startsWith("/home/consumption")) return "/home/consumption"
+  return "/home"
 })
 
-const currentTime = ref('')
+const currentTime = ref("")
 
 const updateTime = () => {
   const now = new Date()
-  const hours = String(now.getHours()).padStart(2, '0')
-  const minutes = String(now.getMinutes()).padStart(2, '0')
-  const seconds = String(now.getSeconds()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, "0")
+  const minutes = String(now.getMinutes()).padStart(2, "0")
+  const seconds = String(now.getSeconds()).padStart(2, "0")
   currentTime.value = `${hours}:${minutes}:${seconds}`
+}
+
+const logout = () => {
+  window.localStorage.removeItem("card-manager-logged-in")
+  router.push("/login")
 }
 
 let timer: number | null = null
@@ -146,7 +171,8 @@ onUnmounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -213,7 +239,7 @@ onUnmounted(() => {
   font-size: 16px;
   color: #ffffff;
   font-weight: 500;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   letter-spacing: 1px;
 }
 
@@ -305,13 +331,17 @@ onUnmounted(() => {
 }
 
 .nav-menu ::v-deep .el-menu-item::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 0;
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, rgba(240, 147, 251, 0.3) 0%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(240, 147, 251, 0.3) 0%,
+    transparent 100%
+  );
   transition: width 0.3s ease;
 }
 
@@ -325,13 +355,17 @@ onUnmounted(() => {
 }
 
 .nav-menu ::v-deep .el-menu-item.is-active {
-  background: linear-gradient(135deg, rgba(240, 147, 251, 0.25) 0%, rgba(245, 87, 108, 0.25) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(240, 147, 251, 0.25) 0%,
+    rgba(245, 87, 108, 0.25) 100%
+  );
   box-shadow: 0 4px 12px rgba(240, 147, 251, 0.3);
   font-weight: 600;
 }
 
 .nav-menu ::v-deep .el-menu-item.is-active::after {
-  content: '';
+  content: "";
   position: absolute;
   right: 0;
   top: 50%;
@@ -377,11 +411,11 @@ onUnmounted(() => {
   .page-aside {
     flex: 0 0 200px;
   }
-  
+
   .header-content {
     padding: 16px 24px;
   }
-  
+
   .layout-body {
     padding: 16px;
   }
@@ -391,11 +425,11 @@ onUnmounted(() => {
   .page-aside {
     flex: 0 0 180px;
   }
-  
+
   .header-subtitle {
     display: none;
   }
-  
+
   .header-time {
     display: none;
   }
