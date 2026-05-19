@@ -23,6 +23,8 @@
                 @edit="editCard"
                 @disable="disableCard"
                 @enable="enableCard"
+                @update-remark="updateCardRemark"
+                @update-snacks="updateCardSnacks"
               />
             </div>
           </div>
@@ -266,6 +268,8 @@ const createDefaultCards = () => {
     isBooked: false,
     bookingInfo: null,
     isDisabled: false,
+    currentOrderRemark: "", // 当前订单备注
+    currentOrderSnacks: [], // 当前订单零食列表
   }))
 }
 
@@ -403,6 +407,8 @@ const settleCard = async (
     finalAmount: number
     memberPhone?: string
     paymentMethod?: string
+    snacks?: any[] // 零食列表
+    snackTotal?: number // 零食总价
   },
 ) => {
   const card = cards.value.find((c) => c.id === id)
@@ -444,6 +450,11 @@ const settleCard = async (
       memberName: memberInfo?.name || null,
       paymentMethod: settleData.paymentMethod || "cash",
       cardType: memberInfo?.cardType || null,
+      // 添加订单备注（从桌台数据中获取）
+      remark: card.currentOrderRemark || "",
+      // 添加零食信息
+      snacks: settleData.snacks || [],
+      snackTotal: settleData.snackTotal || 0,
     }
 
     try {
@@ -464,7 +475,12 @@ const settleCard = async (
         throw new Error(orderResult.message || "创建订单失败")
       }
 
-      // 2. 如果使用会员余额支付，需要扣减余额/次数并创建消费记录
+      // 2. 更新零食库存
+      if (orderData.snacks && orderData.snacks.length > 0) {
+        await updateSnackStock(orderData.snacks)
+      }
+
+      // 3. 如果使用会员余额支付，需要扣减余额/次数并创建消费记录
       if (settleData.paymentMethod === "member_balance" && memberInfo) {
         await processMemberPayment(
           memberInfo,
@@ -474,7 +490,7 @@ const settleCard = async (
         )
       }
 
-      // 3. 重置桌台状态
+      // 4. 重置桌台状态
       card.isInUse = false
       card.isBooked = false
       card.bookingInfo = null
@@ -483,6 +499,8 @@ const settleCard = async (
       card.currentEntertainment = undefined
       card.startTimestamp = null
       card.initialMinutes = undefined
+      card.currentOrderRemark = "" // 清除订单备注
+      card.currentOrderSnacks = [] // 清除订单零食
       saveCards()
 
       ElMessage.success(
@@ -492,6 +510,60 @@ const settleCard = async (
       console.error("结算失败:", error)
       ElMessage.error(error instanceof Error ? error.message : "结算失败")
     }
+  }
+}
+
+// 更新零食库存
+const updateSnackStock = async (snacks: any[]) => {
+  try {
+    // 获取所有零食
+    const response = await fetch("http://localhost:3000/api/snacks")
+    if (!response.ok) {
+      throw new Error("获取零食列表失败")
+    }
+    
+    const result = await response.json()
+    if (!result.success) {
+      throw new Error(result.message || "获取零食列表失败")
+    }
+    
+    const allSnacks = result.data
+    
+    // 更新每个零食的库存
+    for (const snack of snacks) {
+      const snackIndex = allSnacks.findIndex((s: any) => s.id === snack.snackId)
+      if (snackIndex !== -1) {
+        const currentStock = allSnacks[snackIndex].stock || 0
+        const quantity = snack.quantity || 0
+        
+        if (currentStock < quantity) {
+          console.warn(`零食 ${snack.name} 库存不足：当前${currentStock}，需要${quantity}`)
+          continue
+        }
+        
+        // 减少库存
+        allSnacks[snackIndex].stock = currentStock - quantity
+        
+        // 保存更新后的零食数据
+        const updateResponse = await fetch(
+          `http://localhost:3000/api/snacks/${snack.snackId}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(allSnacks[snackIndex]),
+          }
+        )
+        
+        if (!updateResponse.ok) {
+          console.error(`更新零食 ${snack.name} 库存失败`)
+        }
+      }
+    }
+    
+    console.log(`已更新 ${snacks.length} 种零食的库存`)
+  } catch (error) {
+    console.error("更新零食库存失败:", error)
+    // 不抛出错误，避免影响结算流程
   }
 }
 
@@ -621,6 +693,24 @@ const enableCard = (id: string) => {
   if (card) {
     card.isDisabled = false
     ElMessage.success(`卡片 ${id} 已启用`)
+  }
+}
+
+// 更新桌台备注
+const updateCardRemark = (id: string, remark: string) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (card) {
+    card.currentOrderRemark = remark
+    // watch 会自动触发 saveCards
+  }
+}
+
+// 更新桌台零食列表
+const updateCardSnacks = (id: string, snacks: any[]) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (card) {
+    card.currentOrderSnacks = snacks
+    // watch 会自动触发 saveCards
   }
 }
 

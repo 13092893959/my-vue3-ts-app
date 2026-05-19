@@ -154,6 +154,26 @@
             {{ formatDateTime(row.createTime) }}
           </template>
         </el-table-column>
+        <el-table-column label="零食" width="150" align="center">
+          <template #default="{ row }">
+            <div v-if="row.snacks && row.snacks.length > 0">
+              <el-tag size="small" type="success">
+                {{ row.snacks.length }}种
+              </el-tag>
+              <span class="snack-total-inline">
+                ¥{{ (row.snackTotal || calculateSnackTotal(row.snacks)).toFixed(2) }}
+              </span>
+            </div>
+            <span v-else class="no-snack">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="viewOrderDetail(row)">
+              详情
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->
@@ -169,6 +189,120 @@
         />
       </div>
     </div>
+
+    <!-- 订单详情对话框 -->
+    <el-dialog
+      v-model="showDetailDialog"
+      title="订单详情"
+      width="900px"
+      append-to-body
+    >
+      <div v-if="currentOrder" class="order-detail">
+        <!-- 基本信息 -->
+        <div class="detail-section">
+          <h3 class="section-title">基本信息</h3>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="订单ID">{{ currentOrder.id }}</el-descriptions-item>
+            <el-descriptions-item label="桌台编号">{{ currentOrder.tableId }}</el-descriptions-item>
+            <el-descriptions-item label="娱乐类型">{{ currentOrder.entertainment || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="人数">{{ currentOrder.users }}人</el-descriptions-item>
+            <el-descriptions-item label="开始时间">{{ formatDateTime(currentOrder.startTime) }}</el-descriptions-item>
+            <el-descriptions-item label="结束时间">{{ currentOrder.endTime ? formatDateTime(currentOrder.endTime) : '-' }}</el-descriptions-item>
+            <el-descriptions-item label="时长">{{ currentOrder.duration }}分钟</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag :type="currentOrder.status === 'completed' ? 'success' : 'warning'">
+                {{ currentOrder.status === 'completed' ? '已完成' : '进行中' }}
+              </el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- 会员信息 -->
+        <div v-if="currentOrder.memberName" class="detail-section">
+          <h3 class="section-title">会员信息</h3>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="会员姓名">{{ currentOrder.memberName }}</el-descriptions-item>
+            <el-descriptions-item label="手机号">{{ currentOrder.memberPhone || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="卡类型">
+              <el-tag size="small" :type="currentOrder.cardType === '充值卡' ? '' : 'success'">
+                {{ currentOrder.cardType }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="支付方式">
+              <el-tag size="small" :type="getPaymentMethodType(currentOrder.paymentMethod)">
+                {{ getPaymentMethodName(currentOrder.paymentMethod) }}
+              </el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- 费用信息 -->
+        <div class="detail-section">
+          <h3 class="section-title">费用明细</h3>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="单价">{{ currentOrder.pricePerHour || '-' }}元/小时</el-descriptions-item>
+            <el-descriptions-item label="折扣">{{ currentOrder.discount || 100 }}%</el-descriptions-item>
+            <el-descriptions-item label="桌台费用">
+              <span class="amount-text">¥{{ calculateTableAmount(currentOrder).toFixed(2) }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="零食费用">
+              <span class="snack-amount">¥{{ (currentOrder.snackTotal || 0).toFixed(2) }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="总金额" :span="2">
+              <span class="total-amount">
+                ¥{{ (currentOrder.amount || 0).toFixed(2) }}
+              </span>
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+
+        <!-- 零食明细 -->
+        <div v-if="currentOrder.snacks && currentOrder.snacks.length > 0" class="detail-section">
+          <h3 class="section-title">
+            🍿 零食明细
+            <el-tag size="small" type="success" style="margin-left: 8px">
+              {{ currentOrder.snacks.length }}种
+            </el-tag>
+          </h3>
+          <el-table :data="currentOrder.snacks" stripe border size="small" style="width: 100%">
+            <el-table-column prop="name" label="名称" min-width="150" />
+            <el-table-column prop="price" label="单价" width="120" align="right">
+              <template #default="{ row }">
+                ¥{{ row.price.toFixed(2) }}/{{ row.unit }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="quantity" label="数量" width="100" align="center" />
+            <el-table-column prop="unit" label="单位" width="80" align="center" />
+            <el-table-column label="小计" min-width="120" align="right">
+              <template #default="{ row }">
+                <span class="subtotal">¥{{ (row.price * row.quantity).toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="snack-summary">
+            <span>零食总计：</span>
+            <span class="snack-total-price">¥{{ (currentOrder.snackTotal || 0).toFixed(2) }}</span>
+          </div>
+        </div>
+
+        <!-- 备注信息 -->
+        <div v-if="currentOrder.remark" class="detail-section">
+          <h3 class="section-title">备注</h3>
+          <div class="remark-content">{{ currentOrder.remark }}</div>
+        </div>
+
+        <!-- 创建时间 -->
+        <div class="detail-section">
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="创建时间">{{ formatDateTime(currentOrder.createTime) }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="showDetailDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -192,6 +326,12 @@ interface Order {
   memberName?: string
   paymentMethod?: string
   cardType?: string
+  // 零食相关字段
+  snacks?: any[]
+  snackTotal?: number
+  pricePerHour?: number
+  discount?: number
+  remark?: string
 }
 
 interface SearchForm {
@@ -204,6 +344,10 @@ const loading = ref(false)
 const orders = ref<Order[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
+
+// 详情对话框状态
+const showDetailDialog = ref(false)
+const currentOrder = ref<Order | null>(null)
 
 const searchForm = ref<SearchForm>({
   dateRange: null,
@@ -420,6 +564,27 @@ const getPaymentMethodType = (method: string) => {
   return typeMap[method] || 'info'
 }
 
+// 查看订单详情
+const viewOrderDetail = (order: Order) => {
+  currentOrder.value = order
+  showDetailDialog.value = true
+}
+
+// 计算订单的零食总价
+const calculateSnackTotal = (snacks: any[]) => {
+  if (!snacks || snacks.length === 0) return 0
+  return snacks.reduce((total, item) => {
+    return total + (item.price * item.quantity)
+  }, 0)
+}
+
+// 计算桌台费用（不含零食）
+const calculateTableAmount = (order: Order) => {
+  if (!order.amount) return 0
+  const snackTotal = order.snackTotal || 0
+  return order.amount - snackTotal
+}
+
 onMounted(() => {
   fetchOrders()
 })
@@ -524,5 +689,81 @@ onMounted(() => {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+/* 订单详情对话框样式 */
+.order-detail {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.detail-section {
+  margin-bottom: 24px;
+}
+
+.detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #409eff;
+}
+
+.remark-content {
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  color: #606266;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.snack-amount {
+  color: #e6a23c;
+  font-weight: 600;
+}
+
+.total-amount {
+  color: #f56c6c;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.subtotal {
+  color: #606266;
+  font-weight: 600;
+}
+
+.snack-summary {
+  margin-top: 12px;
+  text-align: right;
+  font-size: 14px;
+  color: #606266;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.snack-total-price {
+  color: #f56c6c;
+  font-weight: 700;
+  font-size: 16px;
+  margin-left: 8px;
+}
+
+.snack-total-inline {
+  margin-left: 8px;
+  color: #f56c6c;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.no-snack {
+  color: #c0c4cc;
 }
 </style>
