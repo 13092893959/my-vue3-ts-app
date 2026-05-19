@@ -68,6 +68,10 @@
             <span class="menu-item-icon">🛒</span>
             <span class="menu-item-text">消费记录</span>
           </el-menu-item>
+          <el-menu-item index="/home/snack">
+            <span class="menu-item-icon">🍿</span>
+            <span class="menu-item-text">零食管理</span>
+          </el-menu-item>
         </el-menu>
       </aside>
 
@@ -92,6 +96,7 @@ const activeRoute = computed(() => {
   if (route.path.startsWith("/home/order")) return "/home/order"
   if (route.path.startsWith("/home/recharge")) return "/home/recharge"
   if (route.path.startsWith("/home/consumption")) return "/home/consumption"
+  if (route.path.startsWith("/home/snack")) return "/home/snack"
   return "/home"
 })
 

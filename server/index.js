@@ -16,7 +16,8 @@ const DATA_FILES = {
   rechargeRecords: path.join(DATA_DIR, 'recharge-records.json'),
   consumptionRecords: path.join(DATA_DIR, 'consumption-records.json'),
   tables: path.join(DATA_DIR, 'tables.json'),
-  orders: path.join(DATA_DIR, 'orders.json')
+  orders: path.join(DATA_DIR, 'orders.json'),
+  snacks: path.join(DATA_DIR, 'snacks.json') // 零食数据
 }
 
 // 确保数据目录存在
@@ -30,7 +31,8 @@ const defaultData = {
   rechargeRecords: [],
   consumptionRecords: [],
   tables: [],
-  orders: []
+  orders: [],
+  snacks: [] // 零食数据
 }
 
 // 读取指定类型的数据文件
@@ -78,7 +80,8 @@ const readAllData = () => {
     rechargeRecords: readData('rechargeRecords'),
     consumptionRecords: readData('consumptionRecords'),
     tables: readData('tables'),
-    orders: readData('orders')
+    orders: readData('orders'),
+    snacks: readData('snacks') // 零食数据
   }
 }
 
@@ -312,6 +315,115 @@ app.post('/api/orders', (req, res) => {
   }
 })
 
+// 更新订单备注
+app.put('/api/orders/:orderId/remark', (req, res) => {
+  try {
+    const { orderId } = req.params
+    const { remark } = req.body
+    const orders = readData('orders')
+    
+    const orderIndex = orders.findIndex(o => o.id === orderId)
+    if (orderIndex === -1) {
+      return res.status(404).json({ success: false, message: '订单不存在' })
+    }
+    
+    orders[orderIndex].remark = remark || ''
+    writeData('orders', orders)
+    
+    res.json({ success: true, data: orders[orderIndex] })
+  } catch (error) {
+    console.error('更新订单备注失败:', error)
+    res.status(500).json({ success: false, message: '更新订单备注失败' })
+  }
+})
+
+// ========== 零食管理接口 ==========
+
+// 获取所有零食
+app.get('/api/snacks', (req, res) => {
+  try {
+    const snacks = readData('snacks')
+    res.json({ success: true, data: snacks })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取零食列表失败' })
+  }
+})
+
+// 保存所有零食（用于批量更新）
+app.post('/api/snacks', (req, res) => {
+  try {
+    const snacks = req.body
+    writeData('snacks', snacks)
+    res.json({ success: true, data: snacks })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '保存零食数据失败' })
+  }
+})
+
+// 创建单个零食
+app.post('/api/snacks/create', (req, res) => {
+  try {
+    const newSnack = req.body
+    const snacks = readData('snacks')
+    
+    // 检查ID是否已存在
+    if (snacks.find(s => s.id === newSnack.id)) {
+      return res.status(400).json({ success: false, message: '零食ID已存在' })
+    }
+    
+    snacks.push(newSnack)
+    writeData('snacks', snacks)
+    
+    res.json({ success: true, data: newSnack })
+  } catch (error) {
+    console.error('创建零食失败:', error)
+    res.status(500).json({ success: false, message: '创建零食失败' })
+  }
+})
+
+// 更新零食
+app.put('/api/snacks/:snackId', (req, res) => {
+  try {
+    const { snackId } = req.params
+    const updatedSnack = req.body
+    const snacks = readData('snacks')
+    
+    const snackIndex = snacks.findIndex(s => s.id === snackId)
+    if (snackIndex === -1) {
+      return res.status(404).json({ success: false, message: '零食不存在' })
+    }
+    
+    snacks[snackIndex] = { ...snacks[snackIndex], ...updatedSnack }
+    writeData('snacks', snacks)
+    
+    res.json({ success: true, data: snacks[snackIndex] })
+  } catch (error) {
+    console.error('更新零食失败:', error)
+    res.status(500).json({ success: false, message: '更新零食失败' })
+  }
+})
+
+// 删除零食
+app.delete('/api/snacks/:snackId', (req, res) => {
+  try {
+    const { snackId } = req.params
+    const snacks = readData('snacks')
+    
+    const snackIndex = snacks.findIndex(s => s.id === snackId)
+    if (snackIndex === -1) {
+      return res.status(404).json({ success: false, message: '零食不存在' })
+    }
+    
+    snacks.splice(snackIndex, 1)
+    writeData('snacks', snacks)
+    
+    res.json({ success: true, message: '删除成功' })
+  } catch (error) {
+    console.error('删除零食失败:', error)
+    res.status(500).json({ success: false, message: '删除零食失败' })
+  }
+})
+
 // ========== 健康检查 ==========
 app.get('/api/health', (_, res) => {
   res.json({ 
@@ -321,7 +433,8 @@ app.get('/api/health', (_, res) => {
       rechargeRecords: DATA_FILES.rechargeRecords,
       consumptionRecords: DATA_FILES.consumptionRecords,
       tables: DATA_FILES.tables,
-      orders: DATA_FILES.orders
+      orders: DATA_FILES.orders,
+      snacks: DATA_FILES.snacks // 零食数据文件
     }
   })
 })
@@ -335,4 +448,5 @@ app.listen(port, () => {
   console.log(`  消费记录: ${DATA_FILES.consumptionRecords}`)
   console.log(`  桌台数据: ${DATA_FILES.tables}`)
   console.log(`  订单数据: ${DATA_FILES.orders}`)
+  console.log(`  零食数据: ${DATA_FILES.snacks}`)
 })

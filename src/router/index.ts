@@ -7,6 +7,7 @@ import MemberPage from '../pages/MemberPage.vue'
 import OrderPage from '../pages/OrderPage.vue'
 import RechargePage from '../pages/RechargePage.vue'
 import ConsumptionPage from '../pages/ConsumptionPage.vue'
+import SnackBarPage from '../pages/SnackBarPage.vue'
 
 const routes = [
   {
@@ -49,6 +50,11 @@ const routes = [
         path: 'consumption',
         name: 'Consumption',
         component: ConsumptionPage,
+      },
+      {
+        path: 'snack',
+        name: 'Snack',
+        component: SnackBarPage,
       },
     ],
   },
