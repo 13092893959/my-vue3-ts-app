@@ -1,0 +1,22 @@
+{
+  "name": "baiwancheli-backend",
+  "version": "1.0.0",
+  "description": "百万车厘子管理系统 - 后端服务",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "init": "node server/init-data.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  },
+  "keywords": [
+    "table-management",
+    "member-system",
+    "pos"
+  ],
+  "author": "",
+  "license": "ISC"
+}
