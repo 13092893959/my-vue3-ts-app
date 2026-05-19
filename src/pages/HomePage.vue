@@ -54,7 +54,7 @@
           </el-menu-item>
           <el-menu-item index="/home/member">
             <span class="menu-item-icon">👥</span>
-            <span class="menu-item-text">会员管理</span>
+            <span class="menu-item-text">客户管理</span>
           </el-menu-item>
           <el-menu-item index="/home/order">
             <span class="menu-item-icon">📋</span>
@@ -71,6 +71,10 @@
           <el-menu-item index="/home/snack">
             <span class="menu-item-icon">🍿</span>
             <span class="menu-item-text">零食管理</span>
+          </el-menu-item>
+          <el-menu-item index="/home/settings">
+            <span class="menu-item-icon">⚙️</span>
+            <span class="menu-item-text">系统管理</span>
           </el-menu-item>
         </el-menu>
       </aside>
@@ -97,6 +101,7 @@ const activeRoute = computed(() => {
   if (route.path.startsWith("/home/recharge")) return "/home/recharge"
   if (route.path.startsWith("/home/consumption")) return "/home/consumption"
   if (route.path.startsWith("/home/snack")) return "/home/snack"
+  if (route.path.startsWith("/home/settings")) return "/home/settings"
   return "/home"
 })
 

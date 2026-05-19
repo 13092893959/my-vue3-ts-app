@@ -8,6 +8,7 @@ import OrderPage from '../pages/OrderPage.vue'
 import RechargePage from '../pages/RechargePage.vue'
 import ConsumptionPage from '../pages/ConsumptionPage.vue'
 import SnackBarPage from '../pages/SnackBarPage.vue'
+import SettingsPage from '../pages/SettingsPage.vue'
 
 const routes = [
   {
@@ -55,6 +56,11 @@ const routes = [
         path: 'snack',
         name: 'Snack',
         component: SnackBarPage,
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: SettingsPage,
       },
     ],
   },

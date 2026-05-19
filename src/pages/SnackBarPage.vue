@@ -10,7 +10,6 @@
 
     <div class="content-card">
       <el-table :data="snacks" stripe style="width: 100%" v-loading="loading" border>
-        <el-table-column prop="id" label="零食ID" width="120" align="center" />
         <el-table-column prop="name" label="名称" min-width="120" />
         <el-table-column prop="category" label="分类" width="150" align="center">
           <template #default="{ row }">
@@ -63,11 +62,16 @@
         :rules="rules"
         label-width="100px"
       >
-        <el-form-item label="零食ID" prop="id">
+        <el-form-item label="零食ID">
           <el-input
+            v-if="isEditMode"
             v-model="formData.id"
-            placeholder="例如: SNK009"
-            :disabled="isEditMode"
+            disabled
+          />
+          <el-input
+            v-else
+            value="自动生成"
+            disabled
           />
         </el-form-item>
         <el-form-item label="名称" prop="name">
@@ -103,47 +107,35 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="showFormDialog = false">取消</el-button>
-        <el-button type="primary" @click="saveSnack">保存</el-button>
+        <span class="dialog-footer">
+          <el-button @click="showFormDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveSnack">确定</el-button>
+        </span>
       </template>
     </el-dialog>
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+<script setup>
+import { ref, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
 
-interface Snack {
-  id: string
-  name: string
-  category: string
-  price: number
-  unit: string
-  stock: number
-}
-
-const snacks = ref<Snack[]>([])
+const snacks = ref([])
 const loading = ref(false)
 const showFormDialog = ref(false)
 const isEditMode = ref(false)
-const formRef = ref<FormInstance>()
+const formRef = ref(null)
 
-const formData = ref<Snack>({
+const formData = reactive({
   id: '',
   name: '',
-  category: '饮料',
+  category: '',
   price: 0,
-  unit: '瓶',
+  unit: '',
   stock: 0
 })
 
-const rules: FormRules = {
-  id: [
-    { required: true, message: '请输入零食ID', trigger: 'blur' },
-    { pattern: /^[A-Z0-9]+$/, message: 'ID只能包含大写字母和数字', trigger: 'blur' }
-  ],
+const rules = {
   name: [{ required: true, message: '请输入零食名称', trigger: 'blur' }],
   category: [{ required: true, message: '请选择分类', trigger: 'change' }],
   price: [{ required: true, message: '请输入单价', trigger: 'blur' }],
@@ -151,41 +143,69 @@ const rules: FormRules = {
   stock: [{ required: true, message: '请输入库存', trigger: 'blur' }]
 }
 
-// 加载零食数据
 const loadSnacks = async () => {
   loading.value = true
   try {
     const response = await fetch('http://localhost:3000/api/snacks')
     const result = await response.json()
-    
-    if (result.success) {
-      snacks.value = result.data
-    } else {
-      ElMessage.error(result.message || '加载零食数据失败')
-    }
+    snacks.value = result.data
   } catch (error) {
     console.error('加载零食数据失败:', error)
-    ElMessage.error('网络连接失败，请检查后端服务是否启动')
+    ElMessage.error('网络连接失败')
   } finally {
     loading.value = false
   }
 }
 
-// 显示新增对话框
 const showAddDialog = () => {
   isEditMode.value = false
-  resetForm()
   showFormDialog.value = true
 }
 
-// 编辑零食
-const editSnack = (snack: Snack) => {
+const editSnack = (row) => {
   isEditMode.value = true
-  formData.value = { ...snack }
+  Object.assign(formData, row)
   showFormDialog.value = true
 }
 
-// 保存零食
+const deleteSnack = async (row) => {
+  try {
+    const response = await fetch(`http://localhost:3000/api/snacks/${row.id}`, {
+      method: 'DELETE'
+    })
+    const result = await response.json()
+    if (result.success) {
+      ElMessage.success('删除成功')
+      await loadSnacks()
+    } else {
+      ElMessage.error(result.message || '删除失败')
+    }
+  } catch (error) {
+    console.error('删除零食失败:', error)
+    ElMessage.error('网络连接失败')
+  }
+}
+
+const resetForm = () => {
+  formRef.value.resetFields()
+}
+
+const getCategoryType = (category) => {
+  switch (category) {
+    case '饮料':
+      return 'success'
+    case '零食':
+      return 'warning'
+    case '小吃':
+      return 'info'
+    case '其他':
+      return 'danger'
+    default:
+      return ''
+  }
+}
+
+// 保存零食（新增/编辑）
 const saveSnack = async () => {
   if (!formRef.value) return
   
@@ -210,11 +230,14 @@ const saveSnack = async () => {
           ElMessage.error(result.message || '更新失败')
         }
       } else {
-        // 创建新零食
+        // 创建新零食 - 自动生成ID
+        const newId = `SNK${String(snacks.value.length + 1).padStart(3, '0')}`
+        const snackData = { ...formData.value, id: newId }
+        
         const response = await fetch('http://localhost:3000/api/snacks/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData.value)
+          body: JSON.stringify(snackData)
         })
         
         const result = await response.json()
@@ -233,65 +256,8 @@ const saveSnack = async () => {
   })
 }
 
-// 删除零食
-const deleteSnack = async (snack: Snack) => {
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除零食"${snack.name}"吗？`,
-      '警告',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    const response = await fetch(`http://localhost:3000/api/snacks/${snack.id}`, {
-      method: 'DELETE'
-    })
-    
-    const result = await response.json()
-    if (result.success) {
-      ElMessage.success('删除成功')
-      await loadSnacks()
-    } else {
-      ElMessage.error(result.message || '删除失败')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除零食失败:', error)
-      ElMessage.error('网络连接失败')
-    }
-  }
-}
+loadSnacks()
 
-// 重置表单
-const resetForm = () => {
-  formData.value = {
-    id: '',
-    name: '',
-    category: '饮料',
-    price: 0,
-    unit: '瓶',
-    stock: 0
-  }
-  formRef.value?.clearValidate()
-}
-
-// 获取分类标签类型
-const getCategoryType = (category: string) => {
-  const typeMap: Record<string, any> = {
-    '饮料': '',
-    '零食': 'success',
-    '小吃': 'warning',
-    '其他': 'info'
-  }
-  return typeMap[category] || ''
-}
-
-onMounted(() => {
-  loadSnacks()
-})
 </script>
 
 <style scoped>
@@ -306,25 +272,26 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.page-header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
-
 .content-card {
-  background: #fff;
-  border-radius: 8px;
+  background-color: #fff;
   padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .empty-state {
-  padding: 40px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
 }
 
 .low-stock {
-  color: #f56c6c;
-  font-weight: bold;
+  color: red;
 }
+
+.dialog-footer {
+  text-align: right;
+}
+
 </style>

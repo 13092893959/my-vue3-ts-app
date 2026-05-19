@@ -37,7 +37,8 @@ const DATA_FILES = {
   consumptionRecords: path.join(DATA_DIR, 'consumption-records.json'),
   tables: path.join(DATA_DIR, 'tables.json'),
   orders: path.join(DATA_DIR, 'orders.json'),
-  snacks: path.join(DATA_DIR, 'snacks.json') // 零食数据
+  snacks: path.join(DATA_DIR, 'snacks.json'),
+  packages: path.join(DATA_DIR, 'packages.json')
 }
 
 // 确保数据目录存在
@@ -52,7 +53,8 @@ const defaultData = {
   consumptionRecords: [],
   tables: [],
   orders: [],
-  snacks: [] // 零食数据
+  snacks: [],
+  packages: []
 }
 
 // 读取指定类型的数据文件
@@ -101,7 +103,8 @@ const readAllData = () => {
     consumptionRecords: readData('consumptionRecords'),
     tables: readData('tables'),
     orders: readData('orders'),
-    snacks: readData('snacks') // 零食数据
+    snacks: readData('snacks'),
+    packages: readData('packages')
   }
 }
 
@@ -444,6 +447,89 @@ app.delete('/api/snacks/:snackId', (req, res) => {
   }
 })
 
+// ========== 套餐管理接口 ==========
+
+// 获取所有套餐
+app.get('/api/packages', (req, res) => {
+  try {
+    const packages = readData('packages')
+    res.json({ success: true, data: packages })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取套餐列表失败' })
+  }
+})
+
+// 保存所有套餐
+app.post('/api/packages', (req, res) => {
+  try {
+    const packages = req.body
+    writeData('packages', packages)
+    res.json({ success: true, data: packages })
+  } catch (error) {
+    res.status(500).json({ success: false, message: '保存套餐数据失败' })
+  }
+})
+
+// 创建单个套餐
+app.post('/api/packages/create', (req, res) => {
+  try {
+    const newPackage = req.body
+    const packages = readData('packages')
+    
+    if (packages.find(p => p.id === newPackage.id)) {
+      return res.status(400).json({ success: false, message: '套餐ID已存在' })
+    }
+    
+    packages.push(newPackage)
+    writeData('packages', packages)
+    res.json({ success: true, data: newPackage })
+  } catch (error) {
+    console.error('创建套餐失败:', error)
+    res.status(500).json({ success: false, message: '创建套餐失败' })
+  }
+})
+
+// 更新套餐
+app.put('/api/packages/:packageId', (req, res) => {
+  try {
+    const { packageId } = req.params
+    const updatedPackage = req.body
+    const packages = readData('packages')
+    
+    const index = packages.findIndex(p => p.id === packageId)
+    if (index === -1) {
+      return res.status(404).json({ success: false, message: '套餐不存在' })
+    }
+    
+    packages[index] = { ...packages[index], ...updatedPackage }
+    writeData('packages', packages)
+    res.json({ success: true, data: packages[index] })
+  } catch (error) {
+    console.error('更新套餐失败:', error)
+    res.status(500).json({ success: false, message: '更新套餐失败' })
+  }
+})
+
+// 删除套餐
+app.delete('/api/packages/:packageId', (req, res) => {
+  try {
+    const { packageId } = req.params
+    const packages = readData('packages')
+    
+    const index = packages.findIndex(p => p.id === packageId)
+    if (index === -1) {
+      return res.status(404).json({ success: false, message: '套餐不存在' })
+    }
+    
+    packages.splice(index, 1)
+    writeData('packages', packages)
+    res.json({ success: true, message: '删除成功' })
+  } catch (error) {
+    console.error('删除套餐失败:', error)
+    res.status(500).json({ success: false, message: '删除套餐失败' })
+  }
+})
+
 // ========== 健康检查 ==========
 app.get('/api/health', (_, res) => {
   res.json({ 
@@ -454,7 +540,8 @@ app.get('/api/health', (_, res) => {
       consumptionRecords: DATA_FILES.consumptionRecords,
       tables: DATA_FILES.tables,
       orders: DATA_FILES.orders,
-      snacks: DATA_FILES.snacks // 零食数据文件
+      snacks: DATA_FILES.snacks,
+      packages: DATA_FILES.packages
     }
   })
 })

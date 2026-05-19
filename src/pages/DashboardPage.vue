@@ -16,10 +16,11 @@
               <CardComponent
                 :card="card"
                 @start="startCardTimer"
-                @share="shareTable"
+                @share="shareCard"
                 @orders="viewOrders"
                 @settle="settleCard"
                 @booking="bookingTable"
+                @cancel-booking="cancelBooking"
                 @edit="editCard"
                 @disable="disableCard"
                 @enable="enableCard"
@@ -402,13 +403,14 @@ const startCardTimer = (
 const settleCard = async (
   id: string,
   settleData: {
-    pricePerHour: number
+    totalAmount: number
     discount: number
     finalAmount: number
     memberPhone?: string
     paymentMethod?: string
-    snacks?: any[] // 零食列表
-    snackTotal?: number // 零食总价
+    selectedPackageIds?: string[]
+    snacks?: any[]
+    snackTotal?: number
   },
 ) => {
   const card = cards.value.find((c) => c.id === id)
@@ -433,6 +435,22 @@ const settleCard = async (
       }
     }
 
+    // 查找套餐信息
+    let packageInfos: any[] = []
+    if (settleData.selectedPackageIds && settleData.selectedPackageIds.length > 0) {
+      try {
+        const packagesResponse = await fetch("http://localhost:3000/api/packages")
+        const packagesResult = await packagesResponse.json()
+        if (packagesResult.success) {
+          packageInfos = settleData.selectedPackageIds.map(id => 
+            packagesResult.data.find((p: any) => p.id === id)
+          ).filter(Boolean)
+        }
+      } catch (error) {
+        console.error("加载套餐信息失败:", error)
+      }
+    }
+
     // 构建订单数据
     const orderData: any = {
       tableId: card.id,
@@ -443,13 +461,17 @@ const settleCard = async (
       endTime: endTime,
       duration: durationMinutes,
       amount: settleData.finalAmount,
-      pricePerHour: settleData.pricePerHour,
+      totalAmount: settleData.totalAmount,
       discount: settleData.discount,
       // 新增会员关联信息
       memberPhone: settleData.memberPhone || null,
       memberName: memberInfo?.name || null,
       paymentMethod: settleData.paymentMethod || "cash",
       cardType: memberInfo?.cardType || null,
+      // 新增套餐关联信息（支持多选）
+      packageIds: settleData.selectedPackageIds || [],
+      packageNames: packageInfos.map(p => p.name).join(", "),
+      packageTotal: settleData.totalAmount,
       // 添加订单备注（从桌台数据中获取）
       remark: card.currentOrderRemark || "",
       // 添加零食信息
@@ -637,7 +659,7 @@ const processMemberPayment = async (
   }
 }
 
-const shareTable = (id: string) => {
+const shareCard = (id: string) => {
   ElMessage.info(`卡片 ${id} 拼桌功能`)
 }
 
@@ -657,6 +679,16 @@ const bookingTable = (id: string, bookingData: any) => {
     ElMessage.success(
       `预约成功！桌台 ${id}，人数 ${bookingData.bookingUsers} 人`,
     )
+  }
+}
+
+// 取消预约
+const cancelBooking = (id: string) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (card) {
+    card.isBooked = false
+    card.bookingInfo = null
+    ElMessage.success(`已取消桌台 ${id} 的预约`)
   }
 }
 

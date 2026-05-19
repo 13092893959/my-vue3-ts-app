@@ -247,14 +247,31 @@
               :label="`${member.name} (${member.phone})`"
               :value="member.phone"
             >
-              <span>{{ member.name }}</span>
-              <span style="float: right; color: #8492a6; font-size: 13px">
-                {{
-                  member.cardType === "充值卡"
-                    ? `余额: ¥${(member.balance || 0).toFixed(2)}`
-                    : `剩余: ${member.remainingTimes}次`
-                }}
-              </span>
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                "
+              >
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span>{{ member.name }}</span>
+                  <el-tag
+                    v-if="member.isMember === true"
+                    type="success"
+                    size="small"
+                  >
+                    ⭐ 会员
+                  </el-tag>
+                </div>
+                <span style="color: #8492a6; font-size: 13px">
+                  {{
+                    member.cardType === "充值卡"
+                      ? `余额: ¥${(member.balance || 0).toFixed(2)}`
+                      : `剩余: ${member.remainingTimes}次`
+                  }}
+                </span>
+              </div>
             </el-option>
           </el-select>
         </el-form-item>
@@ -268,17 +285,81 @@
           style="margin-bottom: 16px"
         />
 
-        <el-form-item label="单价(元/小时)">
+        <!-- 显示当前订单备注 -->
+        <el-alert
+          v-if="props.card.currentOrderRemark"
+          title="订单备注"
+          type="warning"
+          :closable="false"
+          style="margin-bottom: 16px"
+        >
+          <template #default>
+            <div style="white-space: pre-wrap; word-break: break-all">
+              {{ props.card.currentOrderRemark }}
+            </div>
+          </template>
+        </el-alert>
+
+        <!-- 团购套餐选择（多选） -->
+        <el-form-item label="团购套餐">
+          <el-select
+            v-model="settleForm.selectedPackageIds"
+            multiple
+            placeholder="请选择团购套餐（可多选）"
+            style="width: 100%"
+            @change="calculateTotalAmount"
+          >
+            <el-option
+              v-for="pkg in availablePackages"
+              :key="pkg.id"
+              :label="`${pkg.name} - ¥${pkg.price}`"
+              :value="pkg.id"
+            >
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                  width: 100%;
+                "
+              >
+                <span style="flex: 1; text-align: left">{{ pkg.name }}</span>
+                <el-tag
+                  size="small"
+                  :type="getEntertainmentTagType(pkg.entertainment)"
+                  style="margin-left: 8px; min-width: 60px; text-align: center"
+                >
+                  {{ pkg.entertainment }}
+                </el-tag>
+                <span
+                  style="
+                    color: #f56c6c;
+                    font-weight: bold;
+                    margin-left: 8px;
+                    min-width: 60px;
+                    text-align: right;
+                  "
+                  >¥{{ pkg.price }}</span
+                >
+              </div>
+            </el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="总金额">
           <el-input-number
-            v-model="settleForm.pricePerHour"
+            v-model="settleForm.totalAmount"
             :min="0"
             :precision="2"
             :step="1"
             controls-position="right"
             style="width: 100%"
             @change="calculateFinalAmount"
-          />
+          >
+            <template #prefix>¥</template>
+          </el-input-number>
         </el-form-item>
+
         <el-form-item label="折扣">
           <el-input-number
             v-model="settleForm.discount"
@@ -296,26 +377,39 @@
         <el-form-item label="支付方式">
           <el-radio-group v-model="settleForm.paymentMethod">
             <el-radio label="member_balance" :disabled="!canUseMemberBalance">
-              会员余额
+              余额支付
             </el-radio>
-            <el-radio label="wechat">微信支付</el-radio>
-            <el-radio label="alipay">支付宝</el-radio>
-            <el-radio label="cash">现金</el-radio>
+            <el-radio label="package">团购套餐</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
-      
+
       <!-- 零食信息区域 -->
-      <div v-if="currentOrder && currentOrder.snacks && currentOrder.snacks.length > 0" class="snack-settle-section">
+      <div
+        v-if="
+          currentOrder && currentOrder.snacks && currentOrder.snacks.length > 0
+        "
+        class="snack-settle-section"
+      >
         <el-divider>零食明细</el-divider>
-        <el-table :data="currentOrder.snacks" size="small" border style="width: 100%">
+        <el-table
+          :data="currentOrder.snacks"
+          size="small"
+          border
+          style="width: 100%"
+        >
           <el-table-column prop="name" label="名称" min-width="120" />
           <el-table-column prop="price" label="单价" width="80" align="right">
             <template #default="{ row }">
               ¥{{ row.price.toFixed(2) }}
             </template>
           </el-table-column>
-          <el-table-column prop="quantity" label="数量" width="140" align="center">
+          <el-table-column
+            prop="quantity"
+            label="数量"
+            width="140"
+            align="center"
+          >
             <template #default="{ row, $index }">
               <el-input-number
                 v-model="row.quantity"
@@ -333,7 +427,11 @@
           </el-table-column>
           <el-table-column label="操作" min-width="100" align="center">
             <template #default="{ $index }">
-              <el-button type="danger" size="small" @click="removeSnackFromOrder($index)">
+              <el-button
+                type="danger"
+                size="small"
+                @click="removeSnackFromOrder($index)"
+              >
                 删除
               </el-button>
             </template>
@@ -341,10 +439,12 @@
         </el-table>
         <div class="snack-settle-total">
           <span>零食总计：</span>
-          <span class="total-price">¥{{ calculateSnackTotal().toFixed(2) }}</span>
+          <span class="total-price"
+            >¥{{ calculateSnackTotal().toFixed(2) }}</span
+          >
         </div>
       </div>
-      
+
       <div class="settle-item highlight final-price">
         <span class="settle-label">应付金额</span>
         <span class="settle-value price"
@@ -430,6 +530,12 @@
           {{ card.bookingInfo.phone }}
         </el-descriptions-item>
       </el-descriptions>
+      <div class="booking-actions">
+        <el-button type="danger" size="small" @click="handleCancelBooking">
+          <el-icon><Close /></el-icon>
+          取消预约
+        </el-button>
+      </div>
     </div>
 
     <div class="detail-actions">
@@ -448,9 +554,9 @@
       <el-button v-if="!card.isDisabled" type="edit" @click="handleEdit"
         >编辑</el-button
       >
-      <el-button v-if="!card.isDisabled" type="danger" @click="handleDisable"
+      <!-- <el-button v-if="!card.isDisabled" type="danger" @click="handleDisable"
         >禁用</el-button
-      >
+      > -->
       <el-button v-if="card.isDisabled" type="success" @click="handleEnable"
         >启用</el-button
       >
@@ -491,7 +597,7 @@
             <el-tag type="warning" size="small">进行中</el-tag>
           </el-descriptions-item>
         </el-descriptions>
-        
+
         <!-- 订单备注输入区域 -->
         <div class="order-remark-section">
           <el-input
@@ -502,16 +608,16 @@
             maxlength="200"
             show-word-limit
           />
-          <el-button 
-            type="primary" 
-            size="small" 
+          <el-button
+            type="primary"
+            size="small"
             @click="saveCurrentOrderRemark"
             style="margin-top: 10px"
           >
             保存备注
           </el-button>
         </div>
-        
+
         <!-- 零食管理区域 -->
         <div class="order-snack-section">
           <div class="snack-header">
@@ -521,16 +627,34 @@
               添加零食
             </el-button>
           </div>
-          
-          <div v-if="currentOrder.snacks && currentOrder.snacks.length > 0" class="snack-list">
-            <el-table :data="currentOrder.snacks" size="small" border style="width: 100%">
+
+          <div
+            v-if="currentOrder.snacks && currentOrder.snacks.length > 0"
+            class="snack-list"
+          >
+            <el-table
+              :data="currentOrder.snacks"
+              size="small"
+              border
+              style="width: 100%"
+            >
               <el-table-column prop="name" label="名称" min-width="120" />
-              <el-table-column prop="price" label="单价" width="80" align="right">
+              <el-table-column
+                prop="price"
+                label="单价"
+                width="80"
+                align="right"
+              >
                 <template #default="{ row }">
                   ¥{{ row.price.toFixed(2) }}
                 </template>
               </el-table-column>
-              <el-table-column prop="quantity" label="数量" width="140" align="center">
+              <el-table-column
+                prop="quantity"
+                label="数量"
+                width="140"
+                align="center"
+              >
                 <template #default="{ row, $index }">
                   <el-input-number
                     v-model="row.quantity"
@@ -540,7 +664,12 @@
                   />
                 </template>
               </el-table-column>
-              <el-table-column prop="unit" label="单位" width="60" align="center" />
+              <el-table-column
+                prop="unit"
+                label="单位"
+                width="60"
+                align="center"
+              />
               <el-table-column label="小计" width="100" align="right">
                 <template #default="{ row }">
                   ¥{{ (row.price * row.quantity).toFixed(2) }}
@@ -548,19 +677,25 @@
               </el-table-column>
               <el-table-column label="操作" min-width="100" align="center">
                 <template #default="{ $index }">
-                  <el-button type="danger" size="small" @click="removeSnackFromOrder($index)">
+                  <el-button
+                    type="danger"
+                    size="small"
+                    @click="removeSnackFromOrder($index)"
+                  >
                     删除
                   </el-button>
                 </template>
               </el-table-column>
             </el-table>
-            
+
             <div class="snack-total">
               <span>零食总计：</span>
-              <span class="total-price">¥{{ calculateSnackTotal().toFixed(2) }}</span>
+              <span class="total-price"
+                >¥{{ calculateSnackTotal().toFixed(2) }}</span
+              >
             </div>
           </div>
-          
+
           <div v-else class="empty-snack">
             <el-empty description="暂未添加零食" :image-size="60" />
           </div>
@@ -569,18 +704,26 @@
     </div>
 
     <!-- 历史订单列表 -->
-    <div class="history-orders-section" :class="{ 'with-current': currentOrder }">
+    <div
+      class="history-orders-section"
+      :class="{ 'with-current': currentOrder }"
+    >
       <div class="section-title">
         <el-icon><Document /></el-icon>
         <span>历史订单记录</span>
-        <el-tag v-if="historyOrders.length > 0" type="info" size="small" style="margin-left: 8px">
+        <el-tag
+          v-if="historyOrders.length > 0"
+          type="info"
+          size="small"
+          style="margin-left: 8px"
+        >
           共 {{ historyOrders.length }} 条
         </el-tag>
       </div>
-      
-      <el-table 
-        :data="historyOrders" 
-        style="width: 100%" 
+
+      <el-table
+        :data="historyOrders"
+        style="width: 100%"
         max-height="400"
         empty-text="暂无历史订单"
       >
@@ -632,7 +775,11 @@
                 {{ row.snacks.length }}种
               </el-tag>
               <span class="snack-total-inline">
-                ¥{{ (row.snackTotal || calculateOrderSnackTotal(row.snacks)).toFixed(2) }}
+                ¥{{
+                  (
+                    row.snackTotal || calculateOrderSnackTotal(row.snacks)
+                  ).toFixed(2)
+                }}
               </span>
             </div>
             <span v-else class="no-snack">-</span>
@@ -677,12 +824,18 @@
           </el-table-column>
           <el-table-column prop="stock" label="库存" width="80">
             <template #default="{ row }">
-              <span :class="{ 'low-stock': row.stock < 20 }">{{ row.stock }}</span>
+              <span :class="{ 'low-stock': row.stock < 20 }">{{
+                row.stock
+              }}</span>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="80" align="center">
             <template #default="{ row }">
-              <el-button type="primary" size="small" @click="addSnackToOrder(row)">
+              <el-button
+                type="primary"
+                size="small"
+                @click="addSnackToOrder(row)"
+              >
                 添加
               </el-button>
             </template>
@@ -696,7 +849,13 @@
         <div v-if="selectedSnacks.length === 0" class="empty-selected">
           <el-empty description="暂未选择" :image-size="60" />
         </div>
-        <el-table v-else :data="selectedSnacks" stripe style="width: 100%" max-height="150">
+        <el-table
+          v-else
+          :data="selectedSnacks"
+          stripe
+          style="width: 100%"
+          max-height="150"
+        >
           <el-table-column prop="name" label="名称" min-width="100" />
           <el-table-column prop="price" label="单价" width="80">
             <template #default="{ row }">
@@ -720,16 +879,22 @@
           </el-table-column>
           <el-table-column label="操作" width="80" align="center">
             <template #default="{ $index }">
-              <el-button type="danger" size="small" @click="removeSnackFromOrder($index)">
+              <el-button
+                type="danger"
+                size="small"
+                @click="removeSnackFromOrder($index)"
+              >
                 删除
               </el-button>
             </template>
           </el-table-column>
         </el-table>
-        
+
         <div v-if="selectedSnacks.length > 0" class="selected-total">
           <span>总计：</span>
-          <span class="total-price">¥{{ calculateSnackTotal().toFixed(2) }}</span>
+          <span class="total-price"
+            >¥{{ calculateSnackTotal().toFixed(2) }}</span
+          >
         </div>
       </div>
     </div>
@@ -794,7 +959,14 @@
 import { ref, onUnmounted, watch, computed } from "vue"
 import { ElMessage, ElMessageBox } from "element-plus"
 import type { FormInstance, FormRules } from "element-plus"
-import { Bell, Lock, VideoPlay, Document, Plus } from "@element-plus/icons-vue"
+import {
+  Bell,
+  Lock,
+  VideoPlay,
+  Document,
+  Plus,
+  Close,
+} from "@element-plus/icons-vue"
 
 defineOptions({
   name: "CardComponent",
@@ -843,16 +1015,18 @@ const emit = defineEmits<{
     e: "settle",
     id: string,
     settleData: {
-      pricePerHour: number
+      totalAmount: number
       discount: number
       finalAmount: number
       memberPhone?: string
       paymentMethod?: string
-      snacks?: any[] // 零食列表
-      snackTotal?: number // 零食总价
+      selectedPackageIds?: string[]
+      snacks?: any[]
+      snackTotal?: number
     },
   ): void
   (e: "booking", id: string, bookingData: any): void
+  (e: "cancel-booking", id: string): void
   (e: "edit", id: string): void
   (e: "disable", id: string): void
   (e: "enable", id: string): void
@@ -924,16 +1098,46 @@ const showSnackDialog = ref(false) // 零食选择对话框
 
 // 结算表单
 const settleForm = ref({
-  pricePerHour: 30, // 默认单价30元/小时
+  totalAmount: 0, // 总金额（套餐总价）
   discount: 100, // 默认100%（无折扣）
-  finalAmount: 0, // 最终金额
+  finalAmount: 0, // 最终金额（应用折扣后）
   memberPhone: "", // 会员手机号
-  paymentMethod: "cash", // 支付方式：member_balance/wechat/alipay/cash
+  paymentMethod: "member_balance", // 支付方式：member_balance/package
+  selectedPackageIds: [] as string[], // 选中的套餐ID列表（多选）
 })
 
 // 可用会员列表
 const availableMembers = ref<any[]>([])
 const selectedMember = ref<any>(null)
+
+// 可用套餐列表
+const availablePackages = ref<any[]>([])
+
+// 根据娱乐类型返回标签颜色类型
+const getEntertainmentTagType = (
+  entertainment: string,
+): "success" | "warning" | "danger" | "info" => {
+  const typeMap: Record<string, "success" | "warning" | "danger" | "info"> = {
+    桌游: "success", // 绿色
+    PS5: "warning", // 橙色
+    拼豆: "danger", // 红色
+    其他: "info", // 灰色
+  }
+  return typeMap[entertainment] || "info"
+}
+
+// 加载套餐列表
+const loadPackages = async () => {
+  try {
+    const response = await fetch("http://localhost:3000/api/packages")
+    const result = await response.json()
+    if (result.success) {
+      availablePackages.value = result.data
+    }
+  } catch (error) {
+    console.error("加载套餐列表失败:", error)
+  }
+}
 
 // 计时表单
 const timerForm = ref({
@@ -1044,7 +1248,9 @@ const viewOrders = async () => {
     if (result.success) {
       // 分离历史订单并按创建时间降序排列（最近的在前）
       historyOrders.value = result.data.sort((a: any, b: any) => {
-        return new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
+        return (
+          new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
+        )
       })
 
       // 如果当前桌台正在使用中，设置当前进行中的订单
@@ -1063,10 +1269,10 @@ const viewOrders = async () => {
           snacks: props.card.currentOrderSnacks || [], // 从桌台数据中加载零食
         }
         currentOrderRemark.value = props.card.currentOrderRemark || ""
-        
+
         // 同步已选零食到selectedSnacks
         selectedSnacks.value = [...(props.card.currentOrderSnacks || [])]
-        
+
         // 加载零食列表
         await loadSnacks()
       } else {
@@ -1077,7 +1283,8 @@ const viewOrders = async () => {
 
       showOrdersDialog.value = true
 
-      const totalOrders = historyOrders.value.length + (currentOrder.value ? 1 : 0)
+      const totalOrders =
+        historyOrders.value.length + (currentOrder.value ? 1 : 0)
       if (totalOrders === 0) {
         ElMessage.info(`卡片 ${props.card.id} 暂无订单记录`)
       }
@@ -1093,14 +1300,14 @@ const viewOrders = async () => {
 // 加载零食列表
 const loadSnacks = async () => {
   try {
-    const response = await fetch('http://localhost:3000/api/snacks')
+    const response = await fetch("http://localhost:3000/api/snacks")
     const result = await response.json()
-    
+
     if (result.success) {
       snacks.value = result.data
     }
   } catch (error) {
-    console.error('加载零食列表失败:', error)
+    console.error("加载零食列表失败:", error)
   }
 }
 
@@ -1127,8 +1334,10 @@ const showSnackSelector = () => {
 
 // 添加零食到订单
 const addSnackToOrder = (snack: any) => {
-  const existingItem = selectedSnacks.value.find(item => item.snackId === snack.id)
-  
+  const existingItem = selectedSnacks.value.find(
+    (item) => item.snackId === snack.id,
+  )
+
   if (existingItem) {
     existingItem.quantity += 1
   } else {
@@ -1137,10 +1346,10 @@ const addSnackToOrder = (snack: any) => {
       name: snack.name,
       price: snack.price,
       unit: snack.unit,
-      quantity: 1
+      quantity: 1,
     })
   }
-  
+
   ElMessage.success(`已添加 ${snack.name}`)
 }
 
@@ -1161,14 +1370,14 @@ const updateSnackQuantity = (index: number, quantity: number) => {
 // 计算零食总价
 const calculateSnackTotal = () => {
   return selectedSnacks.value.reduce((total, item) => {
-    return total + (item.price * item.quantity)
+    return total + item.price * item.quantity
   }, 0)
 }
 
 // 计算订单的零食总价（用于历史订单显示）
 const calculateOrderSnackTotal = (snacks: any[]) => {
   return snacks.reduce((total, item) => {
-    return total + (item.price * item.quantity)
+    return total + item.price * item.quantity
   }, 0)
 }
 
@@ -1176,10 +1385,10 @@ const calculateOrderSnackTotal = (snacks: any[]) => {
 const confirmAddSnacks = () => {
   if (currentOrder.value) {
     currentOrder.value.snacks = [...selectedSnacks.value]
-    
+
     // 通过emit通知父组件更新桌台的零食数据
     emit("update-snacks", props.card.id, selectedSnacks.value)
-    
+
     ElMessage.success(`已添加 ${selectedSnacks.value.length} 种零食`)
     showSnackDialog.value = false
   }
@@ -1222,6 +1431,28 @@ const confirmBooking = async () => {
       ElMessage.success(`预约成功！桌台 ${props.card.id}`)
     }
   })
+}
+
+// 取消预约
+const handleCancelBooking = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要取消桌台 ${props.card.id} 的预约吗？`,
+      "确认取消预约",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    )
+
+    // 触发取消预约事件，传递桌台ID
+    emit("cancel-booking", props.card.id)
+    showDetailDialog.value = false
+    ElMessage.success(`已取消桌台 ${props.card.id} 的预约`)
+  } catch {
+    // 用户取消操作
+  }
 }
 
 const handleEdit = () => {
@@ -1316,30 +1547,40 @@ const calculateBillableHours = () => {
   return Math.ceil(hours) // 向上取整
 }
 
+// 计算套餐总价
+const calculateTotalAmount = () => {
+  let total = 0
+  settleForm.value.selectedPackageIds.forEach((packageId) => {
+    const pkg = availablePackages.value.find((p) => p.id === packageId)
+    if (pkg) {
+      total += pkg.price
+    }
+  })
+  settleForm.value.totalAmount = total
+  calculateFinalAmount()
+}
+
 // 计算最终金额
 const calculateFinalAmount = () => {
-  const billableHours = calculateBillableHours()
-  const baseAmount = billableHours * settleForm.value.pricePerHour
   const discountRate = settleForm.value.discount / 100
-  // 计算桌台费用（应用折扣）
-  const tableAmount = baseAmount * discountRate
+  // 应用折扣到总金额
+  const discountedAmount = settleForm.value.totalAmount * discountRate
   // 加上零食费用（零食不参与折扣）
   const snackTotal = calculateSnackTotal()
-  settleForm.value.finalAmount = tableAmount + snackTotal
+  settleForm.value.finalAmount = discountedAmount + snackTotal
 }
 
 // 打开结算对话框并初始化计算
 const openSettleDialog = async () => {
   // 重置表单为默认值
-  settleForm.value.pricePerHour = 30
+  settleForm.value.totalAmount = 0
   settleForm.value.discount = 100
   settleForm.value.memberPhone = ""
-  settleForm.value.paymentMethod = "cash"
+  settleForm.value.paymentMethod = "member_balance"
+  settleForm.value.selectedPackageIds = []
   selectedMember.value = null
-  // 立即计算最终金额
-  calculateFinalAmount()
-  // 加载会员列表
-  await loadMembers()
+  // 加载会员列表和套餐列表
+  await Promise.all([loadMembers(), loadPackages()])
   // 打开对话框
   showSettleDialog.value = true
 }
@@ -1361,12 +1602,25 @@ const loadMembers = async () => {
 const handleMemberSelect = (phone: string) => {
   selectedMember.value =
     availableMembers.value.find((m) => m.phone === phone) || null
+
   // 如果选择了会员且有余额/次数，默认使用会员支付
   if (selectedMember.value && canUseMemberBalance.value) {
     settleForm.value.paymentMethod = "member_balance"
   } else {
     settleForm.value.paymentMethod = "cash"
   }
+
+  // 如果是会员（isMember为true），自动设置88折优惠
+  if (selectedMember.value && selectedMember.value.isMember === true) {
+    settleForm.value.discount = 88
+    ElMessage.success("会员专享：已自动应用88折优惠")
+  } else {
+    // 非会员恢复默认折扣
+    settleForm.value.discount = 100
+  }
+
+  // 重新计算最终金额
+  calculateFinalAmount()
 }
 
 // 获取会员余额信息
@@ -1396,13 +1650,14 @@ const canUseMemberBalance = computed(() => {
 const confirmSettle = () => {
   // 触发父组件进行结算，传递结算信息和零食数据
   emit("settle", props.card.id, {
-    pricePerHour: settleForm.value.pricePerHour,
+    totalAmount: settleForm.value.totalAmount,
     discount: settleForm.value.discount,
     finalAmount: settleForm.value.finalAmount,
     memberPhone: settleForm.value.memberPhone,
     paymentMethod: settleForm.value.paymentMethod,
-    snacks: currentOrder.value?.snacks || [], // 传递零食信息
-    snackTotal: calculateSnackTotal(), // 传递零食总价
+    selectedPackageIds: settleForm.value.selectedPackageIds,
+    snacks: currentOrder.value?.snacks || [],
+    snackTotal: calculateSnackTotal(),
   })
   showSettleDialog.value = false
 }
@@ -1748,6 +2003,11 @@ onUnmounted(() => {
   font-weight: 600;
   color: #e6a23c;
   margin: 0 0 16px 0;
+}
+
+.booking-actions {
+  margin-top: 16px;
+  text-align: right;
 }
 
 .detail-table-info {

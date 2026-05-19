@@ -8,7 +8,8 @@ const DATA_FILES = {
   consumptionRecords: path.join(DATA_DIR, 'consumption-records.json'),
   tables: path.join(DATA_DIR, 'tables.json'),
   orders: path.join(DATA_DIR, 'orders.json'),
-  snacks: path.join(DATA_DIR, 'snacks.json') // 零食数据
+  snacks: path.join(DATA_DIR, 'snacks.json'),
+  packages: path.join(DATA_DIR, 'packages.json')
 }
 
 // 确保数据目录存在
@@ -59,6 +60,14 @@ const initialSnacks = [
   { id: 'SNK008', name: '瓜子', price: 15, unit: '袋', stock: 45, category: '零食' }
 ]
 
+// 初始套餐数据
+const initialPackages = [
+  { id: 'PKG001', name: '2小时畅玩套餐', price: 58, duration: 120, entertainment: '桌游', description: '包含2小时桌游时间，不限人数' },
+  { id: 'PKG002', name: '下午茶套餐', price: 38, duration: 0, entertainment: '其他', description: '包含指定饮品和小食一份' },
+  { id: 'PKG003', name: '全天通票', price: 128, duration: 480, entertainment: '桌游', description: '营业时间内无限时畅玩' },
+  { id: 'PKG004', name: 'PS5体验券', price: 45, duration: 60, entertainment: 'PS5', description: '限时1小时的PS5游戏体验' }
+]
+
 // 写入各个数据文件
 try {
   // 写入会员数据
@@ -85,6 +94,10 @@ try {
   // 写入零食数据
   fs.writeFileSync(DATA_FILES.snacks, JSON.stringify(initialSnacks, null, 2), 'utf-8')
   console.log('✓ 零食数据已创建:', DATA_FILES.snacks)
+  
+  // 写入套餐数据
+  fs.writeFileSync(DATA_FILES.packages, JSON.stringify(initialPackages, null, 2), 'utf-8')
+  console.log('✓ 套餐数据已创建:', DATA_FILES.packages)
   
   console.log('\n初始化完成！')
   console.log('  会员数量:', initialMembers.length)

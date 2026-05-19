@@ -30,6 +30,17 @@
             <el-option label="次卡" value="次卡" />
           </el-select>
         </el-form-item>
+        <el-form-item label="是否会员">
+          <el-select
+            v-model="searchForm.isMember"
+            placeholder="请选择"
+            clearable
+            style="width: 120px"
+          >
+            <el-option label="是" :value="true" />
+            <el-option label="否" :value="false" />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
             <el-icon><Search /></el-icon>
@@ -69,6 +80,14 @@
       <el-table :data="filteredMembers" stripe style="width: 100%" border>
         <el-table-column type="index" label="序号" width="80" align="center" />
         <el-table-column prop="name" label="姓名" min-width="120" />
+        <el-table-column label="会员标识" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.isMember" type="success" size="small">
+              <el-icon><Star /></el-icon> 会员
+            </el-tag>
+            <span v-else class="no-member">普通客户</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="phone" label="手机号" min-width="130" />
         <el-table-column
           prop="cardType"
@@ -163,10 +182,10 @@
       </el-table>
     </div>
 
-    <!-- 办理会员卡对话框 -->
+    <!-- 办理储值卡对话框 -->
     <el-dialog
       v-model="showAddDialog"
-      :title="currentMember ? '编辑会员' : '办理会员卡'"
+      :title="currentMember ? '编辑客户' : '办理储值卡'"
       width="600px"
     >
       <el-form
@@ -176,7 +195,7 @@
         label-width="100px"
       >
         <el-form-item label="姓名" prop="name">
-          <el-input v-model="memberForm.name" placeholder="请输入会员姓名" />
+          <el-input v-model="memberForm.name" placeholder="请输入姓名" />
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
           <el-input
@@ -185,7 +204,7 @@
             :disabled="!!currentMember"
           />
         </el-form-item>
-        <el-form-item label="卡类型" prop="cardType">
+        <el-form-item label="卡类型" prop="cardType" v-if="!currentMember">
           <el-select
             v-model="memberForm.cardType"
             placeholder="请选择卡类型"
@@ -198,7 +217,7 @@
         <el-form-item
           label="收款金额"
           prop="receiveAmount"
-          v-if="memberForm.cardType === '充值卡'"
+          v-if="!currentMember && memberForm.cardType === '充值卡'"
         >
           <el-input-number
             v-model="memberForm.receiveAmount"
@@ -211,9 +230,9 @@
           <span class="form-tip">元</span>
         </el-form-item>
         <el-form-item
-          label="充值金额"
+          label="赠送金额"
           prop="rechargeAmount"
-          v-if="memberForm.cardType === '充值卡'"
+          v-if="!currentMember && memberForm.cardType === '充值卡'"
         >
           <el-input-number
             v-model="memberForm.rechargeAmount"
@@ -221,29 +240,29 @@
             :precision="2"
             :step="100"
             style="width: 100%"
-            placeholder="实际入账的金额"
+            placeholder="额外赠送的金额（可选）"
           />
           <span class="form-tip">元</span>
         </el-form-item>
         <el-form-item
           label="购买次数"
           prop="times"
-          v-if="memberForm.cardType === '次卡'"
+          v-if="!currentMember && memberForm.cardType === '次卡'"
         >
-          <el-input-number
+          <el-select
             v-model="memberForm.times"
-            :min="0"
-            :precision="0"
-            :step="1"
+            placeholder="请选择购买次数"
             style="width: 100%"
-            placeholder="购买的次数"
-          />
-          <span class="form-tip">次</span>
+            @change="handleTimesChange"
+          >
+            <el-option label="5次 - ¥269.9" :value="5" />
+            <el-option label="10次 - ¥529.9" :value="10" />
+          </el-select>
         </el-form-item>
         <el-form-item
           label="收款金额"
           prop="receiveAmount"
-          v-if="memberForm.cardType === '次卡'"
+          v-if="!currentMember && memberForm.cardType === '次卡'"
         >
           <el-input-number
             v-model="memberForm.receiveAmount"
@@ -254,6 +273,13 @@
             placeholder="客户实际支付的金额"
           />
           <span class="form-tip">元</span>
+        </el-form-item>
+        
+        <!-- 是否会员复选框（移到最下方） -->
+        <el-form-item label="是否会员">
+          <el-checkbox v-model="memberForm.isMember">
+            会员身份（结算时自动享受88折优惠，不勾选则为普通客户）
+          </el-checkbox>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -448,13 +474,26 @@
           </template>
         </el-table-column>
         <el-table-column
-          prop="rechargeAmount"
-          label="充值金额"
+          label="赠送金额"
           width="120"
           align="center"
         >
           <template #default="{ row }">
-            {{ (row.rechargeAmount || 0).toFixed(2) }}元
+            <span v-if="(row.rechargeAmount || 0) > (row.receiveAmount || 0)" style="color: #67c23a; font-weight: 600;">
+              +{{ ((row.rechargeAmount || 0) - (row.receiveAmount || 0)).toFixed(2) }}元
+            </span>
+            <span v-else style="color: #909399;">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="入账总额"
+          width="120"
+          align="center"
+        >
+          <template #default="{ row }">
+            <span style="color: #409eff; font-weight: 600;">
+              {{ (row.rechargeAmount || 0).toFixed(2) }}元
+            </span>
           </template>
         </el-table-column>
         <el-table-column
@@ -513,6 +552,7 @@ interface Member {
   id: number
   name: string
   phone: string
+  isMember?: boolean // 是否为会员
   cardType?: string // 充值卡、次卡
   balance?: number // 余额（充值卡）
   remainingTimes?: number // 剩余次数（次卡）
@@ -529,7 +569,7 @@ interface RechargeRecord {
   phone: string
   name: string
   receiveAmount: number // 收款金额（客户实际支付的金额）
-  rechargeAmount: number // 充值金额（实际到账的金额）
+  rechargeAmount: number // 入账总额（收款金额 + 赠送金额）
   type: string
 }
 
@@ -551,12 +591,14 @@ interface SearchForm {
   name: string
   phone: string
   cardType: string
+  isMember: boolean | null // 是否会员（null表示全部）
 }
 
 const searchForm = reactive<SearchForm>({
   name: "",
   phone: "",
   cardType: "",
+  isMember: null,
 })
 
 // 过滤后的会员列表
@@ -575,6 +617,7 @@ const memberFormRef = ref<FormInstance>()
 const memberForm = reactive({
   name: "",
   phone: "",
+  isMember: true, // 默认勾选为会员
   cardType: "",
   receiveAmount: 0, // 收款金额（客户实际支付的金额）
   rechargeAmount: 0, // 充值金额（实际到账的金额，仅充值卡使用）
@@ -644,6 +687,13 @@ const applyFilters = () => {
     filtered = filtered.filter((m) => m.cardType === searchForm.cardType)
   }
 
+  // 按是否会员过滤
+  if (searchForm.isMember !== null && searchForm.isMember !== undefined) {
+    filtered = filtered.filter(
+      (m) => (m.isMember === true) === searchForm.isMember,
+    )
+  }
+
   filteredMembers.value = filtered
 }
 
@@ -658,6 +708,7 @@ const handleReset = () => {
   searchForm.name = ""
   searchForm.phone = ""
   searchForm.cardType = ""
+  searchForm.isMember = null
   applyFilters()
   ElMessage.success("已重置查询条件")
 }
@@ -855,6 +906,15 @@ const formatDate = (date?: string) => {
   return date
 }
 
+// 处理次卡次数选择变化，自动设置收款金额
+const handleTimesChange = (times: number) => {
+  if (times === 5) {
+    memberForm.receiveAmount = 269.9
+  } else if (times === 10) {
+    memberForm.receiveAmount = 529.9
+  }
+}
+
 const handleAddMember = () => {
   currentMember.value = null
   resetMemberForm()
@@ -880,6 +940,7 @@ const handleEditMember = (row: Member) => {
   currentMember.value = row
   memberForm.name = row.name
   memberForm.phone = row.phone
+  memberForm.isMember = row.isMember !== false // 默认为会员
   memberForm.cardType = row.cardType || ""
   // 根据卡类型设置金额或次数
   if (row.cardType === "充值卡") {
@@ -945,44 +1006,64 @@ const submitMemberForm = async () => {
 
   await memberFormRef.value.validate(async (valid) => {
     if (valid) {
+      // 所有客户都创建档案，isMember只影响结算时的折扣
       const memberData: any = {
         name: memberForm.name,
         phone: memberForm.phone,
-        cardType: memberForm.cardType,
-        level: "青铜会员",
-        totalConsumption: 0,
-        playTime: 0,
+        isMember: memberForm.isMember, // 保存会员标识（仅用于结算折扣）
       }
 
-      if (memberForm.cardType === "充值卡") {
-        // 充值卡：设置余额（使用充值金额，如果未填则默认等于收款金额）
-        const rechargeAmount =
-          memberForm.rechargeAmount > 0
-            ? memberForm.rechargeAmount
-            : memberForm.receiveAmount
-        memberData.balance = rechargeAmount
-        memberData.remainingTimes = null
-      } else if (memberForm.cardType === "次卡") {
-        // 次卡：设置剩余次数
-        memberData.remainingTimes = memberForm.times
-        memberData.balance = null
-      }
-
-      let result
       if (currentMember.value) {
-        // 编辑模式
-        result = await updateMember(currentMember.value.phone, memberData)
+        // 编辑模式：保留原有的卡类型、余额、次数等信息
+        memberData.cardType = currentMember.value.cardType
+        memberData.level = currentMember.value.level || "青铜会员"
+        memberData.totalConsumption = currentMember.value.totalConsumption || 0
+        memberData.playTime = currentMember.value.playTime || 0
+        
+        // 保留原有的余额或次数
+        if (currentMember.value.cardType === "充值卡") {
+          memberData.balance = currentMember.value.balance
+          memberData.remainingTimes = null
+        } else if (currentMember.value.cardType === "次卡") {
+          memberData.remainingTimes = currentMember.value.remainingTimes
+          memberData.balance = null
+        }
+        
+        // 更新会员信息
+        const result = await updateMember(currentMember.value.phone, memberData)
+        if (result.success) {
+          ElMessage.success("客户信息已更新")
+          showAddDialog.value = false
+          resetMemberForm()
+          await loadMembers()
+        } else {
+          ElMessage.error(result.message || "操作失败")
+        }
       } else {
-        // 新增模式
-        result = await addMember(memberData)
+        // 新增模式：按原有逻辑处理
+        memberData.cardType = memberForm.cardType
+        memberData.level = "青铜会员"
+        memberData.totalConsumption = 0
+        memberData.playTime = 0
 
-        // 如果是新增会员且有充值金额/次数，创建充值记录
+        if (memberForm.cardType === "充值卡") {
+          // 充值卡：余额 = 收款金额 + 赠送金额
+          const giftAmount = memberForm.rechargeAmount || 0 // 赠送金额（默认为0）
+          memberData.balance = memberForm.receiveAmount + giftAmount
+          memberData.remainingTimes = null
+        } else if (memberForm.cardType === "次卡") {
+          // 次卡：设置剩余次数
+          memberData.remainingTimes = memberForm.times
+          memberData.balance = null
+        }
+
+        const result = await addMember(memberData)
+
+        // 如果是新增且有充值金额/次数，创建充值记录
         if (result.success && memberForm.receiveAmount > 0) {
           const rechargeAmount =
             memberForm.cardType === "充值卡"
-              ? memberForm.rechargeAmount > 0
-                ? memberForm.rechargeAmount
-                : memberForm.receiveAmount
+              ? memberForm.receiveAmount + (memberForm.rechargeAmount || 0) // 收款金额 + 赠送金额
               : memberForm.receiveAmount
 
           const rechargeRecord: RechargeRecord = {
@@ -1000,17 +1081,15 @@ const submitMemberForm = async () => {
             console.error("创建充值记录失败:", recordResult.message)
           }
         }
-      }
 
-      if (result.success) {
-        ElMessage.success(
-          currentMember.value ? "会员信息已更新" : "会员办理成功",
-        )
-        showAddDialog.value = false
-        resetMemberForm()
-        await loadMembers()
-      } else {
-        ElMessage.error(result.message || "操作失败")
+        if (result.success) {
+          ElMessage.success("储值卡办理成功")
+          showAddDialog.value = false
+          resetMemberForm()
+          await loadMembers()
+        } else {
+          ElMessage.error(result.message || "操作失败")
+        }
       }
     }
   })
@@ -1141,6 +1220,7 @@ const submitRenew = async () => {
 const resetMemberForm = () => {
   memberForm.name = ""
   memberForm.phone = ""
+  memberForm.isMember = true
   memberForm.cardType = ""
   memberForm.receiveAmount = 0
   memberForm.rechargeAmount = 0
