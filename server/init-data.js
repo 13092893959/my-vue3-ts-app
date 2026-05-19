@@ -48,25 +48,11 @@ const initialTables = Array.from({ length: 6 }, (_, index) => ({
   currentOrderSnacks: [] // 当前订单零食列表
 }))
 
-// 初始零食数据
-const initialSnacks = [
-  { id: 'SNK001', name: '可乐', price: 5, unit: '瓶', stock: 100, category: '饮料' },
-  { id: 'SNK002', name: '雪碧', price: 5, unit: '瓶', stock: 80, category: '饮料' },
-  { id: 'SNK003', name: '矿泉水', price: 3, unit: '瓶', stock: 120, category: '饮料' },
-  { id: 'SNK004', name: '薯片', price: 8, unit: '包', stock: 50, category: '零食' },
-  { id: 'SNK005', name: '巧克力', price: 12, unit: '块', stock: 40, category: '零食' },
-  { id: 'SNK006', name: '饼干', price: 10, unit: '盒', stock: 60, category: '零食' },
-  { id: 'SNK007', name: '果冻', price: 6, unit: '个', stock: 70, category: '零食' },
-  { id: 'SNK008', name: '瓜子', price: 15, unit: '袋', stock: 45, category: '零食' }
-]
+// 初始零食数据（为空，不设置默认数据）
+const initialSnacks = []
 
-// 初始套餐数据
-const initialPackages = [
-  { id: 'PKG001', name: '2小时畅玩套餐', price: 58, duration: 120, entertainment: '桌游', description: '包含2小时桌游时间，不限人数' },
-  { id: 'PKG002', name: '下午茶套餐', price: 38, duration: 0, entertainment: '其他', description: '包含指定饮品和小食一份' },
-  { id: 'PKG003', name: '全天通票', price: 128, duration: 480, entertainment: '桌游', description: '营业时间内无限时畅玩' },
-  { id: 'PKG004', name: 'PS5体验券', price: 45, duration: 60, entertainment: 'PS5', description: '限时1小时的PS5游戏体验' }
-]
+// 初始套餐数据（为空，不设置默认数据）
+const initialPackages = []
 
 // 写入各个数据文件
 try {

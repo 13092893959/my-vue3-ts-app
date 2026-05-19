@@ -546,6 +546,132 @@ app.get('/api/health', (_, res) => {
   })
 })
 
+// 获取首页统计数据
+app.get('/api/statistics/overview', (req, res) => {
+  try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStart = today.getTime()
+    
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStart = yesterday.getTime()
+    
+    // 读取所有数据
+    const orders = readData('orders')
+    const members = readData('members')
+    const rechargeRecords = readData('rechargeRecords')
+    const consumptionRecords = readData('consumptionRecords')
+    const tables = readData('tables')
+    
+    // 今日订单统计
+    const todayOrders = orders.filter(order => {
+      const orderDate = new Date(order.createTime)
+      return orderDate.getTime() >= todayStart
+    })
+    
+    const todayRevenue = todayOrders.reduce((sum, order) => {
+      return sum + (order.amount || 0)
+    }, 0)
+    
+    // 昨日订单统计（用于计算趋势）
+    const yesterdayOrders = orders.filter(order => {
+      const orderDate = new Date(order.createTime)
+      return orderDate.getTime() >= yesterdayStart && orderDate.getTime() < todayStart
+    })
+    
+    const yesterdayRevenue = yesterdayOrders.reduce((sum, order) => {
+      return sum + (order.amount || 0)
+    }, 0)
+    
+    // 计算营收趋势
+    let revenueTrend = 0
+    if (yesterdayRevenue > 0) {
+      revenueTrend = ((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100
+    } else if (todayRevenue > 0) {
+      revenueTrend = 100 // 昨日为0，今日有收入，增长100%
+    }
+    
+    // 订单数趋势
+    const orderTrend = todayOrders.length - yesterdayOrders.length
+    
+    // 活跃桌台数
+    const activeTables = tables.filter(t => t.isInUse).length
+    const totalTables = tables.length
+    const utilizationRate = totalTables > 0 ? Math.round((activeTables / totalTables) * 100) : 0
+    
+    // 今日新增会员
+    const newMemberToday = members.filter(member => {
+      const memberDate = new Date(member.createTime)
+      return memberDate.getTime() >= todayStart
+    }).length
+    
+    // 本周营收数据（最近7天）
+    const weekData = []
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      date.setHours(0, 0, 0, 0)
+      const dayStart = date.getTime()
+      const dayEnd = dayStart + 24 * 60 * 60 * 1000
+      
+      const dayOrders = orders.filter(order => {
+        const orderDate = new Date(order.createTime)
+        return orderDate.getTime() >= dayStart && orderDate.getTime() < dayEnd
+      })
+      
+      const dayRevenue = dayOrders.reduce((sum, order) => sum + (order.amount || 0), 0)
+      
+      const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+      weekData.push({
+        label: weekDays[date.getDay()],
+        value: dayRevenue,
+        date: date.toISOString().split('T')[0]
+      })
+    }
+    
+    // 热门娱乐项目排行
+    const entertainmentStats = {}
+    orders.forEach(order => {
+      if (order.entertainment) {
+        if (!entertainmentStats[order.entertainment]) {
+          entertainmentStats[order.entertainment] = {
+            name: order.entertainment,
+            count: 0,
+            revenue: 0
+          }
+        }
+        entertainmentStats[order.entertainment].count++
+        entertainmentStats[order.entertainment].revenue += (order.amount || 0)
+      }
+    })
+    
+    const topEntertainments = Object.values(entertainmentStats)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5) // 取前5名
+    
+    res.json({
+      success: true,
+      data: {
+        todayRevenue,
+        todayOrders: todayOrders.length,
+        activeTables,
+        totalTables,
+        utilizationRate,
+        newMembers: members.length,
+        newMemberToday,
+        revenueTrend: Math.round(revenueTrend * 10) / 10, // 保留一位小数
+        orderTrend,
+        weekData,
+        topEntertainments
+      }
+    })
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+    res.status(500).json({ success: false, message: '获取统计数据失败' })
+  }
+})
+
 // 启动服务
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`)

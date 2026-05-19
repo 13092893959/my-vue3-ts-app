@@ -1,7 +1,7 @@
 <template>
   <div class="snack-management-page">
     <div class="page-header">
-      <h2>🍿 零食管理</h2>
+      <h2></h2>
       <el-button type="primary" @click="showAddDialog" size="large">
         <el-icon><Plus /></el-icon>
         新增零食
@@ -9,9 +9,20 @@
     </div>
 
     <div class="content-card">
-      <el-table :data="snacks" stripe style="width: 100%" v-loading="loading" border>
+      <el-table
+        :data="snacks"
+        stripe
+        style="width: 100%"
+        v-loading="loading"
+        border
+      >
         <el-table-column prop="name" label="名称" min-width="120" />
-        <el-table-column prop="category" label="分类" width="150" align="center">
+        <el-table-column
+          prop="category"
+          label="分类"
+          width="150"
+          align="center"
+        >
           <template #default="{ row }">
             <el-tag :type="getCategoryType(row.category)">
               {{ row.category }}
@@ -19,9 +30,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="price" label="单价" width="150" align="right">
-          <template #default="{ row }">
-            ¥{{ row.price.toFixed(2) }}
-          </template>
+          <template #default="{ row }"> ¥{{ row.price.toFixed(2) }} </template>
         </el-table-column>
         <el-table-column prop="unit" label="单位" width="150" align="center" />
         <el-table-column prop="stock" label="库存" width="150" align="center">
@@ -43,9 +52,9 @@
         </el-table-column>
       </el-table>
 
-      <div v-if="snacks.length === 0 && !loading" class="empty-state">
+      <!-- <div v-if="snacks.length === 0 && !loading" class="empty-state">
         <el-empty description="暂无零食数据" />
-      </div>
+      </div> -->
     </div>
 
     <!-- 新增/编辑零食对话框 -->
@@ -63,22 +72,18 @@
         label-width="100px"
       >
         <el-form-item label="零食ID">
-          <el-input
-            v-if="isEditMode"
-            v-model="formData.id"
-            disabled
-          />
-          <el-input
-            v-else
-            value="自动生成"
-            disabled
-          />
+          <el-input v-if="isEditMode" v-model="formData.id" disabled />
+          <el-input v-else value="自动生成" disabled />
         </el-form-item>
         <el-form-item label="名称" prop="name">
           <el-input v-model="formData.name" placeholder="请输入零食名称" />
         </el-form-item>
         <el-form-item label="分类" prop="category">
-          <el-select v-model="formData.category" placeholder="请选择分类" style="width: 100%">
+          <el-select
+            v-model="formData.category"
+            placeholder="请选择分类"
+            style="width: 100%"
+          >
             <el-option label="饮料" value="饮料" />
             <el-option label="零食" value="零食" />
             <el-option label="小吃" value="小吃" />
@@ -117,8 +122,8 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive } from "vue"
+import { ElMessage } from "element-plus"
 
 const snacks = ref([])
 const loading = ref(false)
@@ -127,31 +132,31 @@ const isEditMode = ref(false)
 const formRef = ref(null)
 
 const formData = reactive({
-  id: '',
-  name: '',
-  category: '',
+  id: "",
+  name: "",
+  category: "",
   price: 0,
-  unit: '',
-  stock: 0
+  unit: "",
+  stock: 0,
 })
 
 const rules = {
-  name: [{ required: true, message: '请输入零食名称', trigger: 'blur' }],
-  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
-  price: [{ required: true, message: '请输入单价', trigger: 'blur' }],
-  unit: [{ required: true, message: '请输入单位', trigger: 'blur' }],
-  stock: [{ required: true, message: '请输入库存', trigger: 'blur' }]
+  name: [{ required: true, message: "请输入零食名称", trigger: "blur" }],
+  category: [{ required: true, message: "请选择分类", trigger: "change" }],
+  price: [{ required: true, message: "请输入单价", trigger: "blur" }],
+  unit: [{ required: true, message: "请输入单位", trigger: "blur" }],
+  stock: [{ required: true, message: "请输入库存", trigger: "blur" }],
 }
 
 const loadSnacks = async () => {
   loading.value = true
   try {
-    const response = await fetch('http://localhost:3000/api/snacks')
+    const response = await fetch("http://localhost:3000/api/snacks")
     const result = await response.json()
     snacks.value = result.data
   } catch (error) {
-    console.error('加载零食数据失败:', error)
-    ElMessage.error('网络连接失败')
+    console.error("加载零食数据失败:", error)
+    ElMessage.error("网络连接失败")
   } finally {
     loading.value = false
   }
@@ -171,18 +176,18 @@ const editSnack = (row) => {
 const deleteSnack = async (row) => {
   try {
     const response = await fetch(`http://localhost:3000/api/snacks/${row.id}`, {
-      method: 'DELETE'
+      method: "DELETE",
     })
     const result = await response.json()
     if (result.success) {
-      ElMessage.success('删除成功')
+      ElMessage.success("删除成功")
       await loadSnacks()
     } else {
-      ElMessage.error(result.message || '删除失败')
+      ElMessage.error(result.message || "删除失败")
     }
   } catch (error) {
-    console.error('删除零食失败:', error)
-    ElMessage.error('网络连接失败')
+    console.error("删除零食失败:", error)
+    ElMessage.error("网络连接失败")
   }
 }
 
@@ -192,72 +197,77 @@ const resetForm = () => {
 
 const getCategoryType = (category) => {
   switch (category) {
-    case '饮料':
-      return 'success'
-    case '零食':
-      return 'warning'
-    case '小吃':
-      return 'info'
-    case '其他':
-      return 'danger'
+    case "饮料":
+      return "success"
+    case "零食":
+      return "warning"
+    case "小吃":
+      return "info"
+    case "其他":
+      return "danger"
     default:
-      return ''
+      return ""
   }
 }
 
 // 保存零食（新增/编辑）
 const saveSnack = async () => {
   if (!formRef.value) return
-  
+
   await formRef.value.validate(async (valid) => {
     if (!valid) return
-    
+
     try {
       if (isEditMode.value) {
         // 更新零食
-        const response = await fetch(`http://localhost:3000/api/snacks/${formData.value.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData.value)
-        })
-        
+        const response = await fetch(
+          `http://localhost:3000/api/snacks/${formData.value.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formData.value),
+          },
+        )
+
         const result = await response.json()
         if (result.success) {
-          ElMessage.success('更新成功')
+          ElMessage.success("更新成功")
           await loadSnacks()
           showFormDialog.value = false
         } else {
-          ElMessage.error(result.message || '更新失败')
+          ElMessage.error(result.message || "更新失败")
         }
       } else {
         // 创建新零食 - 自动生成ID
-        const newId = `SNK${String(snacks.value.length + 1).padStart(3, '0')}`
+        const newId = `SNK${String(snacks.value.length + 1).padStart(3, "0")}`
         const snackData = { ...formData.value, id: newId }
-        
-        const response = await fetch('http://localhost:3000/api/snacks/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(snackData)
-        })
-        
+
+        const response = await fetch(
+          "http://localhost:3000/api/snacks/create",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(snackData),
+          },
+        )
+
         const result = await response.json()
         if (result.success) {
-          ElMessage.success('添加成功')
+          ElMessage.success("添加成功")
           await loadSnacks()
           showFormDialog.value = false
         } else {
-          ElMessage.error(result.message || '添加失败')
+          ElMessage.error(result.message || "添加失败")
         }
       }
     } catch (error) {
-      console.error('保存零食失败:', error)
-      ElMessage.error('网络连接失败')
+      console.error("保存零食失败:", error)
+      ElMessage.error("网络连接失败")
     }
   })
 }
 
 loadSnacks()
-
 </script>
 
 <style scoped>
@@ -293,5 +303,4 @@ loadSnacks()
 .dialog-footer {
   text-align: right;
 }
-
 </style>

@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LoginPage from '../pages/LoginPage.vue'
 import HomePage from '../pages/HomePage.vue'
-import HomeMainPage from '../pages/HomeMainPage.vue'
+import DashboardOverview from '../pages/DashboardOverview.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import MemberPage from '../pages/MemberPage.vue'
 import OrderPage from '../pages/OrderPage.vue'
@@ -25,7 +25,7 @@ const routes = [
       {
         path: '',
         name: 'HomeMain',
-        component: HomeMainPage,
+        component: DashboardOverview,
       },
       {
         path: 'dashboard',
