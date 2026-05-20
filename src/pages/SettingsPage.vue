@@ -9,7 +9,21 @@
               <el-icon><Plus /></el-icon> 新增套餐
             </el-button>
           </div>
-          <el-table :data="packages" stripe border style="width: 100%">
+          <el-table 
+            ref="packageTableRef"
+            :data="packages" 
+            stripe 
+            border 
+            style="width: 100%"
+            row-key="id"
+          >
+            <el-table-column width="50" align="center">
+              <template #default>
+                <el-icon class="drag-handle" style="cursor: move;">
+                  <Rank />
+                </el-icon>
+              </template>
+            </el-table-column>
             <el-table-column prop="name" label="套餐名称" min-width="150" />
             <el-table-column prop="entertainment" label="适用类型" width="120" align="center">
               <template #default="{ row }">
@@ -103,15 +117,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
+import { Plus, Rank } from '@element-plus/icons-vue'
+import Sortable from 'sortablejs'
 
 const activeTab = ref('packages')
 const packages = ref<any[]>([])
 const showPackageDialog = ref(false)
 const isEdit = ref(false)
 const packageFormRef = ref<FormInstance>()
+const packageTableRef = ref()
 
 const packageForm = reactive({
   id: '',
@@ -139,9 +156,58 @@ const loadPackages = async () => {
   try {
     const res = await fetch('http://localhost:3000/api/packages')
     const result = await res.json()
-    if (result.success) packages.value = result.data
+    if (result.success) {
+      packages.value = result.data
+      // 数据加载完成后初始化拖拽
+      await nextTick()
+      initSortable()
+    }
   } catch (error) {
     ElMessage.error('加载套餐失败')
+  }
+}
+
+// 初始化拖拽排序
+const initSortable = () => {
+  if (!packageTableRef.value) return
+  
+  const tbody = packageTableRef.value.$el.querySelector('.el-table__body-wrapper tbody')
+  if (!tbody) return
+  
+  Sortable.create(tbody, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: async (evt: any) => {
+      const { oldIndex, newIndex } = evt
+      if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return
+      
+      // 交换数组中的元素
+      const movedItem = packages.value.splice(oldIndex, 1)[0]
+      packages.value.splice(newIndex, 0, movedItem)
+      
+      // 保存到后端
+      await savePackagesOrder()
+    }
+  })
+}
+
+// 保存套餐排序到后端
+const savePackagesOrder = async () => {
+  try {
+    const res = await fetch('http://localhost:3000/api/packages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(packages.value)
+    })
+    const result = await res.json()
+    if (result.success) {
+      ElMessage.success('排序已保存')
+    } else {
+      ElMessage.error('保存排序失败')
+    }
+  } catch (error) {
+    console.error('保存排序失败:', error)
+    ElMessage.error('网络请求失败')
   }
 }
 
@@ -252,5 +318,26 @@ onMounted(() => {
 }
 .theme-content {
   max-width: 600px;
+}
+
+/* 拖拽手柄样式 */
+.drag-handle {
+  font-size: 18px;
+  color: #909399;
+  transition: color 0.3s;
+}
+
+.drag-handle:hover {
+  color: #409eff;
+}
+
+/* 拖拽时的行样式 */
+:deep(.sortable-ghost) {
+  opacity: 0.5;
+  background-color: #f0f9ff;
+}
+
+:deep(.sortable-chosen) {
+  background-color: #ecf5ff;
 }
 </style>

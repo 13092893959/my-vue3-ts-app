@@ -164,6 +164,13 @@ const loadSnacks = async () => {
 
 const showAddDialog = () => {
   isEditMode.value = false
+  // 重置表单数据
+  formData.id = ""
+  formData.name = ""
+  formData.category = ""
+  formData.price = 0
+  formData.unit = ""
+  formData.stock = 0
   showFormDialog.value = true
 }
 
@@ -192,7 +199,18 @@ const deleteSnack = async (row) => {
 }
 
 const resetForm = () => {
-  formRef.value.resetFields()
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
+  // 重置表单数据
+  if (!isEditMode.value) {
+    formData.id = ""
+    formData.name = ""
+    formData.category = ""
+    formData.price = 0
+    formData.unit = ""
+    formData.stock = 0
+  }
 }
 
 const getCategoryType = (category) => {
@@ -218,18 +236,21 @@ const saveSnack = async () => {
     if (!valid) return
 
     try {
+      console.log("准备保存零食数据:", formData)
+
       if (isEditMode.value) {
         // 更新零食
         const response = await fetch(
-          `http://localhost:3000/api/snacks/${formData.value.id}`,
+          `http://localhost:3000/api/snacks/${formData.id}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formData.value),
+            body: JSON.stringify(formData),
           },
         )
 
         const result = await response.json()
+        console.log("更新结果:", result)
         if (result.success) {
           ElMessage.success("更新成功")
           await loadSnacks()
@@ -240,7 +261,9 @@ const saveSnack = async () => {
       } else {
         // 创建新零食 - 自动生成ID
         const newId = `SNK${String(snacks.value.length + 1).padStart(3, "0")}`
-        const snackData = { ...formData.value, id: newId }
+        const snackData = { ...formData, id: newId }
+
+        console.log("发送的零食数据:", snackData)
 
         const response = await fetch(
           "http://localhost:3000/api/snacks/create",
@@ -252,6 +275,7 @@ const saveSnack = async () => {
         )
 
         const result = await response.json()
+        console.log("创建结果:", result)
         if (result.success) {
           ElMessage.success("添加成功")
           await loadSnacks()

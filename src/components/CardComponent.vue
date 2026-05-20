@@ -235,14 +235,15 @@
         <el-form-item label="关联会员">
           <el-select
             v-model="settleForm.memberPhone"
-            placeholder="选择会员（可选）"
+            placeholder="输入手机号或姓名搜索会员（可选）"
             filterable
             clearable
+            :filter-method="filterMembers"
             style="width: 100%"
             @change="handleMemberSelect"
           >
             <el-option
-              v-for="member in availableMembers"
+              v-for="member in filteredMembers"
               :key="member.phone"
               :label="`${member.name} (${member.phone})`"
               :value="member.phone"
@@ -516,7 +517,7 @@
       </el-descriptions>
     </div>
 
-    <!-- 预约信息展示 -->
+    <!-- 颯约信息展示 -->
     <div v-if="card.isBooked && card.bookingInfo" class="detail-booking-info">
       <h3 class="detail-booking-title">预约信息</h3>
       <el-descriptions :column="2" border>
@@ -1109,6 +1110,27 @@ const settleForm = ref({
 // 可用会员列表
 const availableMembers = ref<any[]>([])
 const selectedMember = ref<any>(null)
+
+// 会员搜索关键字
+const memberSearchKeyword = ref("")
+
+// 过滤后的会员列表（根据搜索关键字）
+const filteredMembers = computed(() => {
+  if (!memberSearchKeyword.value) {
+    return availableMembers.value
+  }
+  
+  const keyword = memberSearchKeyword.value.toLowerCase()
+  return availableMembers.value.filter(member => 
+    member.name.toLowerCase().includes(keyword) || 
+    member.phone.includes(keyword)
+  )
+})
+
+// 会员过滤方法
+const filterMembers = (query: string) => {
+  memberSearchKeyword.value = query
+}
 
 // 可用套餐列表
 const availablePackages = ref<any[]>([])

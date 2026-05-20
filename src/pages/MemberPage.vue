@@ -177,6 +177,12 @@
             <el-button size="small" @click="handleViewMemberRecords(row)"
               >消费记录</el-button
             >
+            <el-button
+              size="small"
+              type="danger"
+              @click="handleDeleteMember(row)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -979,6 +985,38 @@ const handleRenewCard = (row: Member) => {
     renewForm.amount = 0
   }
   showRenewDialog.value = true
+}
+
+// 删除会员
+const handleDeleteMember = async (row: Member) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除客户"${row.name}"吗？此操作不可恢复！`,
+      "警告",
+      {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    )
+
+    const response = await fetch(`http://localhost:3000/api/members/${row.phone}`, {
+      method: "DELETE",
+    })
+
+    const result = await response.json()
+    if (result.success) {
+      ElMessage.success("删除成功")
+      await loadMembers()
+    } else {
+      ElMessage.error(result.message || "删除失败")
+    }
+  } catch (error: any) {
+    if (error !== "cancel") {
+      console.error("删除会员失败:", error)
+      ElMessage.error("删除失败")
+    }
+  }
 }
 
 const handleViewMemberRecords = async (row: Member) => {
