@@ -154,41 +154,73 @@
           </el-card>
         </el-col>
 
-        <!-- 右侧：实时动态 -->
+        <!-- 右侧：今日营收明细 -->
         <el-col :xs="24" :lg="8">
-          <el-card class="activity-card" shadow="hover">
+          <el-card class="revenue-detail-card" shadow="hover">
             <template #header>
               <div class="card-header">
                 <span class="header-title">
-                  <span class="icon">🔔</span>
-                  实时动态
+                  <span class="icon"></span>
+                  今日营收明细
                 </span>
-                <el-badge
-                  :value="recentActivities.length"
-                  :max="99"
-                  type="primary"
-                />
+                <el-tag type="success" size="small">
+                  ¥{{ todayTotalRevenue.toFixed(2) }}
+                </el-tag>
               </div>
             </template>
 
-            <div class="activity-list">
-              <div
-                v-for="(activity, index) in recentActivities"
-                :key="index"
-                class="activity-item"
-              >
-                <div class="activity-icon" :class="activity.type">
-                  {{ getActivityIcon(activity.type) }}
+            <div class="revenue-list">
+              <!-- 桌台收入 -->
+              <div class="revenue-item table-revenue">
+                <div class="revenue-icon">🎮</div>
+                <div class="revenue-content">
+                  <div class="revenue-label">桌台收入</div>
+                  <div class="revenue-amount">¥{{ tableRevenue.toFixed(2) }}</div>
+                  <div class="revenue-detail">{{ tableOrderCount }}笔订单</div>
                 </div>
-                <div class="activity-content">
-                  <div class="activity-text">{{ activity.text }}</div>
-                  <div class="activity-time">{{ activity.time }}</div>
+              </div>
+
+              <!-- 零食收入 -->
+              <div class="revenue-item snack-revenue">
+                <div class="revenue-icon">🍿</div>
+                <div class="revenue-content">
+                  <div class="revenue-label">零食收入</div>
+                  <div class="revenue-amount">¥{{ snackRevenue.toFixed(2) }}</div>
+                  <div class="revenue-detail">{{ snackOrderCount }}笔销售</div>
+                </div>
+              </div>
+
+              <!-- 会员充值 -->
+              <div class="revenue-item recharge-revenue">
+                <div class="revenue-icon">💳</div>
+                <div class="revenue-content">
+                  <div class="revenue-label">会员充值</div>
+                  <div class="revenue-amount">¥{{ rechargeAmount.toFixed(2) }}</div>
+                  <div class="revenue-detail">{{ rechargeCount }}笔充值</div>
+                </div>
+              </div>
+
+              <!-- 按娱乐类型细分 -->
+              <div v-if="entertainmentBreakdown.length > 0" class="revenue-breakdown">
+                <div class="breakdown-title">收入构成</div>
+                <div
+                  v-for="(item, index) in entertainmentBreakdown"
+                  :key="index"
+                  class="breakdown-item"
+                >
+                  <div class="breakdown-info">
+                    <el-tag :type="getEntertainmentTagType(item.name)" size="small">
+                      {{ item.name }}
+                    </el-tag>
+                    <span class="breakdown-count">{{ item.count }}次</span>
+                  </div>
+                  <div class="breakdown-amount">¥{{ item.revenue.toFixed(2) }}</div>
                 </div>
               </div>
 
               <el-empty
-                v-if="recentActivities.length === 0"
-                description="暂无动态"
+                v-if="!hasTodayRevenue"
+                description="今日暂无营收数据"
                 :image-size="80"
               />
             </div>
@@ -348,6 +380,25 @@ const revenueTrend = ref(0)
 const orderTrend = ref(0)
 const utilizationRate = ref(0)
 
+// 今日营收明细相关数据
+const tableRevenue = ref(0) // 桌台收入
+const snackRevenue = ref(0) // 零食收入
+const rechargeAmount = ref(0) // 会员充值金额
+const tableOrderCount = ref(0) // 桌台订单数
+const snackOrderCount = ref(0) // 零食销售笔数
+const rechargeCount = ref(0) // 充值笔数
+const entertainmentBreakdown = ref<Array<{ name: string; count: number; revenue: number }>>([]) // 按娱乐类型细分
+
+// 计算今日总收入
+const todayTotalRevenue = computed(() => {
+  return tableRevenue.value + snackRevenue.value + rechargeAmount.value
+})
+
+// 判断是否有今日营收数据
+const hasTodayRevenue = computed(() => {
+  return todayTotalRevenue.value > 0 || entertainmentBreakdown.value.length > 0
+})
+
 // 桌台数据
 const tables = ref<any[]>([])
 
@@ -401,11 +452,21 @@ const formatBookingTime = (time: string) => {
 const getActivityIcon = (type: string) => {
   const icons: Record<string, string> = {
     order: "🎮",
-    member: "👤",
+    member: "",
     recharge: "💳",
     system: "⚙️",
   }
-  return icons[type] || "📌"
+  return icons[type] || ""
+}
+
+// 根据娱乐类型返回标签颜色
+const getEntertainmentTagType = (entertainment: string): "success" | "warning" | "danger" | "info" => {
+  const typeMap: Record<string, "success" | "warning" | "danger" | "info"> = {
+    桌游: "success", // 绿色
+    PS5: "warning", // 橙色
+    拼豆: "danger", // 红色
+  }
+  return typeMap[entertainment] || "info"
 }
 
 // 处理桌台点击
@@ -461,7 +522,94 @@ const loadData = async () => {
   }
 }
 
-// 加载最近动态
+// 加载今日营收明细
+const loadTodayRevenueDetail = async () => {
+  try {
+    // 重置数据
+    tableRevenue.value = 0
+    snackRevenue.value = 0
+    rechargeAmount.value = 0
+    tableOrderCount.value = 0
+    snackOrderCount.value = 0
+    rechargeCount.value = 0
+    entertainmentBreakdown.value = []
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStart = today.getTime()
+
+    // 1. 获取今日订单数据
+    const ordersResponse = await fetch("http://localhost:3000/api/orders")
+    const ordersResult = await ordersResponse.json()
+    
+    if (ordersResult.success) {
+      const todayOrders = ordersResult.data.filter((order: any) => {
+        const orderTime = new Date(order.createTime).getTime()
+        return orderTime >= todayStart && order.status === "completed"
+      })
+
+      // 统计桌台收入和零食收入
+      let entertainmentStats: Record<string, { count: number; revenue: number }> = {}
+
+      todayOrders.forEach((order: any) => {
+        // 桌台收入（总金额 - 零食金额）
+        const tableAmount = (order.amount || 0) - (order.snackTotal || 0)
+        tableRevenue.value += tableAmount
+        tableOrderCount.value++
+
+        // 零食收入
+        if (order.snackTotal && order.snackTotal > 0) {
+          snackRevenue.value += order.snackTotal
+          snackOrderCount.value++
+        }
+
+        // 按娱乐类型统计
+        const entertainment = order.entertainment || "其他"
+        if (!entertainmentStats[entertainment]) {
+          entertainmentStats[entertainment] = { count: 0, revenue: 0 }
+        }
+        entertainmentStats[entertainment].count++
+        entertainmentStats[entertainment].revenue += order.amount || 0
+      })
+
+      // 转换为数组格式
+      entertainmentBreakdown.value = Object.entries(entertainmentStats)
+        .map(([name, stats]) => ({
+          name,
+          count: stats.count,
+          revenue: stats.revenue
+        }))
+        .sort((a, b) => b.revenue - a.revenue) // 按收入降序排列
+    }
+
+    // 2. 获取今日充值记录
+    const rechargeResponse = await fetch("http://localhost:3000/api/recharge-records")
+    const rechargeResult = await rechargeResponse.json()
+    
+    if (rechargeResult.success) {
+      const todayRecharges = rechargeResult.data.filter((record: any) => {
+        const recordDate = new Date(record.date).getTime()
+        return recordDate >= todayStart
+      })
+
+      rechargeCount.value = todayRecharges.length
+      rechargeAmount.value = todayRecharges.reduce(
+        (sum: number, record: any) => sum + (record.receiveAmount || 0),
+        0
+      )
+    }
+
+    console.log("今日营收明细加载完成:", {
+      tableRevenue: tableRevenue.value,
+      snackRevenue: snackRevenue.value,
+      rechargeAmount: rechargeAmount.value,
+      total: todayTotalRevenue.value
+    })
+  } catch (error) {
+    console.error("加载今日营收明细失败:", error)
+  }
+}
+
 const loadRecentActivities = async () => {
   try {
     const activities: Activity[] = []
@@ -605,9 +753,15 @@ let refreshTimer: number | null = null
 
 onMounted(() => {
   loadData()
+  
+  // 加载今日营收明细
+  loadTodayRevenueDetail()
 
   // 每30秒刷新一次数据
-  refreshTimer = window.setInterval(loadData, 30000)
+  refreshTimer = window.setInterval(() => {
+    loadData()
+    loadTodayRevenueDetail() // 同时刷新营收明细
+  }, 30000)
 })
 
 onUnmounted(() => {
@@ -809,6 +963,133 @@ onUnmounted(() => {
 }
 
 /* 实时动态 */
+.activity-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* 今日营收明细 */
+.revenue-detail-card {
+  border-radius: 12px;
+  height: 100%;
+}
+
+.revenue-list {
+  padding: 8px;
+}
+
+.revenue-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.revenue-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.revenue-item.table-revenue {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e8f5e9 100%);
+  border-left: 4px solid #67c23a;
+}
+
+.revenue-item.snack-revenue {
+  background: linear-gradient(135deg, #fff8e1 0%, #fef3e2 100%);
+  border-left: 4px solid #e6a23c;
+}
+
+.revenue-item.recharge-revenue {
+  background: linear-gradient(135deg, #ecf5ff 0%, #e3f2fd 100%);
+  border-left: 4px solid #409eff;
+}
+
+.revenue-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.revenue-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.revenue-label {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 4px;
+}
+
+.revenue-amount {
+  font-size: 24px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 4px;
+}
+
+.revenue-detail {
+  font-size: 12px;
+  color: #909399;
+}
+
+/* 收入构成细分 */
+.revenue-breakdown {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #dcdfe6;
+}
+
+.breakdown-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 12px;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.breakdown-item:hover {
+  background: #ecf5ff;
+}
+
+.breakdown-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breakdown-count {
+  font-size: 12px;
+  color: #606266;
+}
+
+.breakdown-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f56c6c;
+}
+
 .activity-list {
   max-height: 400px;
   overflow-y: auto;
