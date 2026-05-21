@@ -774,7 +774,7 @@ onUnmounted(() => {
 <style scoped>
 .dashboard-overview {
   padding: 20px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  background: var(--app-bg-secondary);
   min-height: calc(100vh - 120px);
 }
 
@@ -827,14 +827,14 @@ onUnmounted(() => {
 
 .stat-label {
   font-size: 14px;
-  color: #909399;
+  color: var(--app-text-muted);
   margin-bottom: 8px;
 }
 
 .stat-value {
   font-size: 28px;
   font-weight: bold;
-  color: #303133;
+  color: var(--app-text-strong);
   margin-bottom: 4px;
 }
 
@@ -844,16 +844,16 @@ onUnmounted(() => {
 }
 
 .stat-trend.up {
-  color: #67c23a;
+  color: var(--app-success-color);
 }
 
 .stat-trend.down {
-  color: #f56c6c;
+  color: var(--app-danger-color);
 }
 
 .stat-sub {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
 }
 
 /* 中部区域 */
@@ -876,7 +876,7 @@ onUnmounted(() => {
 .header-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--app-text-strong);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -895,7 +895,7 @@ onUnmounted(() => {
 }
 
 .table-mini-card {
-  background: #fff;
+  background: var(--app-bg-elevated);
   border: 2px solid #ebeef5;
   border-radius: 8px;
   padding: 12px;
@@ -909,30 +909,30 @@ onUnmounted(() => {
 }
 
 .table-mini-card.table-idle {
-  border-color: #67c23a;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e8f5e9 100%);
+  border-color: var(--app-success-color);
+  background: var(--app-gradient-success);
 }
 
 .table-mini-card.table-in-use {
-  border-color: #f56c6c;
-  background: linear-gradient(135deg, #fef0f0 0%, #ffebee 100%);
+  border-color: var(--app-danger-color);
+  background: var(--app-gradient-danger);
 }
 
 .table-mini-card.table-booked {
   border-color: #e6a23c;
-  background: linear-gradient(135deg, #fdf6ec 0%, #fff8e1 100%);
+  background: var(--app-gradient-warning);
 }
 
 .table-mini-card.table-disabled {
-  border-color: #909399;
-  background: #f5f7fa;
+  border-color: var(--app-text-muted);
+  background: var(--app-bg-secondary);
   opacity: 0.6;
 }
 
 .table-code {
   font-size: 16px;
   font-weight: bold;
-  color: #303133;
+  color: var(--app-text-strong);
   margin-bottom: 8px;
   text-align: center;
 }
@@ -944,7 +944,7 @@ onUnmounted(() => {
 
 .table-info {
   font-size: 12px;
-  color: #606266;
+  color: var(--app-main-text);
 }
 
 .info-item {
@@ -954,12 +954,12 @@ onUnmounted(() => {
 }
 
 .info-item .label {
-  color: #909399;
+  color: var(--app-text-muted);
 }
 
 .info-item .value {
   font-weight: 500;
-  color: #303133;
+  color: var(--app-text-strong);
 }
 
 /* 实时动态 */
@@ -994,7 +994,7 @@ onUnmounted(() => {
 }
 
 .revenue-item.table-revenue {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e8f5e9 100%);
+  background: var(--app-gradient-success);
   border-left: 4px solid #67c23a;
 }
 
@@ -1004,7 +1004,7 @@ onUnmounted(() => {
 }
 
 .revenue-item.recharge-revenue {
-  background: linear-gradient(135deg, #ecf5ff 0%, #e3f2fd 100%);
+  background: var(--app-gradient-primary);
   border-left: 4px solid #409eff;
 }
 
@@ -1017,7 +1017,7 @@ onUnmounted(() => {
   justify-content: center;
   font-size: 24px;
   flex-shrink: 0;
-  background: #fff;
+  background: var(--app-bg-elevated);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -1028,20 +1028,20 @@ onUnmounted(() => {
 
 .revenue-label {
   font-size: 14px;
-  color: #606266;
+  color: var(--app-main-text);
   margin-bottom: 4px;
 }
 
 .revenue-amount {
   font-size: 24px;
   font-weight: bold;
-  color: #303133;
+  color: var(--app-text-strong);
   margin-bottom: 4px;
 }
 
 .revenue-detail {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
 }
 
 /* 收入构成细分 */
@@ -1054,7 +1054,7 @@ onUnmounted(() => {
 .breakdown-title {
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: var(--app-text-strong);
   margin-bottom: 12px;
 }
 
@@ -1064,13 +1064,13 @@ onUnmounted(() => {
   align-items: center;
   padding: 8px 12px;
   margin-bottom: 8px;
-  background: #f5f7fa;
+  background: var(--app-bg-secondary);
   border-radius: 6px;
   transition: background 0.2s;
 }
 
 .breakdown-item:hover {
-  background: #ecf5ff;
+  background: var(--app-bg-tertiary);
 }
 
 .breakdown-info {
@@ -1081,13 +1081,13 @@ onUnmounted(() => {
 
 .breakdown-count {
   font-size: 12px;
-  color: #606266;
+  color: var(--app-main-text);
 }
 
 .breakdown-amount {
   font-size: 14px;
   font-weight: 600;
-  color: #f56c6c;
+  color: var(--app-danger-color);
 }
 
 .activity-list {
@@ -1105,7 +1105,7 @@ onUnmounted(() => {
 }
 
 .activity-item:hover {
-  background: #f5f7fa;
+  background: var(--app-bg-secondary);
 }
 
 .activity-item:last-child {
@@ -1124,19 +1124,19 @@ onUnmounted(() => {
 }
 
 .activity-icon.order {
-  background: #ecf5ff;
+  background: var(--app-bg-tertiary);
 }
 
 .activity-icon.member {
-  background: #f0f9ff;
+  background: var(--app-bg-secondary);
 }
 
 .activity-icon.recharge {
-  background: #f0f9ff;
+  background: var(--app-bg-secondary);
 }
 
 .activity-icon.system {
-  background: #f4f4f5;
+  background: var(--app-bg-tertiary);
 }
 
 .activity-content {
@@ -1146,14 +1146,14 @@ onUnmounted(() => {
 
 .activity-text {
   font-size: 14px;
-  color: #303133;
+  color: var(--app-text-strong);
   margin-bottom: 4px;
   line-height: 1.5;
 }
 
 .activity-time {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-text-muted);
 }
 
 /* 底部区域 */
@@ -1209,12 +1209,12 @@ onUnmounted(() => {
 .bar-label {
   margin-top: 8px;
   font-size: 12px;
-  color: #606266;
+  color: var(--app-main-text);
 }
 
 .bar-value {
   font-size: 11px;
-  color: #909399;
+  color: var(--app-text-muted);
   margin-top: 4px;
 }
 
@@ -1229,13 +1229,13 @@ onUnmounted(() => {
   gap: 12px;
   padding: 12px;
   margin-bottom: 8px;
-  background: #f5f7fa;
+  background: var(--app-bg-secondary);
   border-radius: 8px;
   transition: all 0.2s;
 }
 
 .ranking-item:hover {
-  background: #ecf5ff;
+  background: var(--app-bg-tertiary);
   transform: translateX(4px);
 }
 
@@ -1276,7 +1276,7 @@ onUnmounted(() => {
 .rank-name {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: var(--app-text-strong);
   margin-bottom: 4px;
 }
 
@@ -1287,11 +1287,11 @@ onUnmounted(() => {
 }
 
 .rank-meta .count {
-  color: #606266;
+  color: var(--app-main-text);
 }
 
 .rank-meta .revenue {
-  color: #f56c6c;
+  color: var(--app-danger-color);
   font-weight: 500;
 }
 

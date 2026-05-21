@@ -760,7 +760,7 @@ watch(cards, saveCards, { deep: true })
 <style scoped>
 .dashboard-page {
   height: 100%;
-  background: #f6f7fb;
+  background: var(--app-bg-secondary);
   overflow: hidden;
 }
 
@@ -790,7 +790,7 @@ watch(cards, saveCards, { deep: true })
   flex: 1 1 auto;
   font-size: 24px;
   font-weight: 600;
-  color: #303133;
+  color: var(--app-text-strong);
 }
 
 .header-actions {
@@ -829,7 +829,7 @@ watch(cards, saveCards, { deep: true })
 
 .unit {
   margin-left: 8px;
-  color: #909399;
+  color: var(--app-text-muted);
 }
 
 .dialog-footer {

@@ -596,7 +596,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   padding: 20px;
-  background: #f5f7fa;
+  background: var(--app-bg-secondary);
 }
 
 .page-header {
@@ -605,7 +605,7 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 20px;
   padding: 20px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--app-gradient-primary);
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
 }
@@ -623,7 +623,7 @@ onMounted(() => {
 }
 
 .search-panel {
-  background: #ffffff;
+  background: var(--app-bg-elevated);
   padding: 20px 24px;
   border-radius: 12px;
   margin-bottom: 20px;
@@ -641,7 +641,7 @@ onMounted(() => {
 }
 
 .stat-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--app-gradient-primary);
   padding: 20px;
   border-radius: 12px;
   color: #ffffff;
@@ -668,7 +668,7 @@ onMounted(() => {
 
 .table-container {
   flex: 1;
-  background: #ffffff;
+  background: var(--app-bg-elevated);
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -676,12 +676,12 @@ onMounted(() => {
 }
 
 .amount-text {
-  color: #f56c6c;
+  color: var(--app-danger-color);
   font-weight: 600;
 }
 
 .times-card-text {
-  color: #e6a23c;
+  color: var(--app-warning-color);
   font-weight: 600;
 }
 
@@ -708,7 +708,7 @@ onMounted(() => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--app-text-strong);
   margin: 0 0 12px 0;
   padding-bottom: 8px;
   border-bottom: 2px solid #409eff;
@@ -716,26 +716,26 @@ onMounted(() => {
 
 .remark-content {
   padding: 12px;
-  background: #f5f7fa;
+  background: var(--app-bg-secondary);
   border-radius: 4px;
-  color: #606266;
+  color: var(--app-main-text);
   line-height: 1.6;
   white-space: pre-wrap;
 }
 
 .snack-amount {
-  color: #e6a23c;
+  color: var(--app-warning-color);
   font-weight: 600;
 }
 
 .total-amount {
-  color: #f56c6c;
+  color: var(--app-danger-color);
   font-weight: 700;
   font-size: 18px;
 }
 
 .subtotal {
-  color: #606266;
+  color: var(--app-main-text);
   font-weight: 600;
 }
 
@@ -743,14 +743,14 @@ onMounted(() => {
   margin-top: 12px;
   text-align: right;
   font-size: 14px;
-  color: #606266;
+  color: var(--app-main-text);
   padding: 12px;
-  background: #f5f7fa;
+  background: var(--app-bg-secondary);
   border-radius: 4px;
 }
 
 .snack-total-price {
-  color: #f56c6c;
+  color: var(--app-danger-color);
   font-weight: 700;
   font-size: 16px;
   margin-left: 8px;
@@ -758,12 +758,12 @@ onMounted(() => {
 
 .snack-total-inline {
   margin-left: 8px;
-  color: #f56c6c;
+  color: var(--app-danger-color);
   font-weight: 600;
   font-size: 12px;
 }
 
 .no-snack {
-  color: #c0c4cc;
+  color: var(--app-text-muted);
 }
 </style>

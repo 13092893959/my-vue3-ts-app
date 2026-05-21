@@ -12,7 +12,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #4a5d7c;
+  color: var(--app-main-text);
 }
 
 .home-main-placeholder h2 {
@@ -23,6 +23,6 @@
 .home-main-placeholder p {
   max-width: 520px;
   line-height: 1.8;
-  color: #6d7b92;
+  color: var(--app-text-muted);
 }
 </style>

@@ -396,7 +396,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   padding: 20px;
-  background: #f5f7fa;
+  background: var(--app-bg-secondary);
 }
 
 .page-header {
@@ -405,7 +405,7 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 20px;
   padding: 20px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--app-gradient-primary);
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
 }
@@ -423,7 +423,7 @@ onMounted(() => {
 }
 
 .search-panel {
-  background: #ffffff;
+  background: var(--app-bg-elevated);
   padding: 20px 24px;
   border-radius: 12px;
   margin-bottom: 20px;
@@ -441,7 +441,7 @@ onMounted(() => {
 }
 
 .stat-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--app-gradient-primary);
   padding: 20px;
   border-radius: 12px;
   color: #ffffff;
@@ -468,7 +468,7 @@ onMounted(() => {
 
 .table-container {
   flex: 1;
-  background: #ffffff;
+  background: var(--app-bg-elevated);
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -476,17 +476,17 @@ onMounted(() => {
 }
 
 .amount-text {
-  color: #67c23a;
+  color: var(--app-success-color);
   font-weight: 600;
 }
 
 .receive-amount-text {
-  color: #409eff;
+  color: var(--el-color-primary);
   font-weight: 600;
 }
 
 .recharge-amount-text {
-  color: #67c23a;
+  color: var(--app-success-color);
   font-weight: 600;
 }
 

@@ -41,8 +41,8 @@
           :router="true"
           unique-opened
           background-color="transparent"
-          text-color="#b8c7ee"
-          active-text-color="#ffffff"
+          text-color="var(--app-sidebar-text)"
+          active-text-color="var(--app-sidebar-active-text)"
         >
           <el-menu-item index="/home">
             <span class="menu-item-icon">🏠</span>
@@ -140,13 +140,13 @@ onUnmounted(() => {
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--app-layout-bg);
 }
 
 /* 顶部Header样式 */
 .page-header {
   flex: 0 0 auto;
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  background: var(--app-header-bg);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -171,7 +171,7 @@ onUnmounted(() => {
 .logo-icon {
   width: 50px;
   height: 50px;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: var(--app-logo-bg);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -205,7 +205,7 @@ onUnmounted(() => {
   margin: 0;
   font-size: 26px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--app-header-text);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   letter-spacing: 1px;
 }
@@ -213,7 +213,7 @@ onUnmounted(() => {
 .header-subtitle {
   margin: 0;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--app-header-sub-text);
   letter-spacing: 2px;
   font-weight: 300;
 }
@@ -229,7 +229,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--app-time-bg);
   border-radius: 24px;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -247,7 +247,7 @@ onUnmounted(() => {
 
 .time-text {
   font-size: 16px;
-  color: #ffffff;
+  color: var(--app-header-text);
   font-weight: 500;
   font-family: "Courier New", monospace;
   letter-spacing: 1px;
@@ -258,7 +258,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 20px;
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  background: var(--app-user-info-bg);
   border-radius: 24px;
   box-shadow: 0 4px 12px rgba(240, 147, 251, 0.3);
   transition: all 0.3s ease;
@@ -276,7 +276,7 @@ onUnmounted(() => {
 
 .user-name {
   font-size: 15px;
-  color: #ffffff;
+  color: var(--app-header-text);
   font-weight: 500;
 }
 
@@ -297,7 +297,7 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 0;
   border-radius: 20px;
-  background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+  background: var(--app-sidebar-bg);
   box-shadow: 0 8px 32px rgba(30, 60, 114, 0.3);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -315,7 +315,7 @@ onUnmounted(() => {
   gap: 10px;
   font-size: 18px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--app-header-text);
   letter-spacing: 1px;
 }
 
@@ -365,11 +365,7 @@ onUnmounted(() => {
 }
 
 .nav-menu ::v-deep .el-menu-item.is-active {
-  background: linear-gradient(
-    135deg,
-    rgba(240, 147, 251, 0.25) 0%,
-    rgba(245, 87, 108, 0.25) 100%
-  );
+  background: var(--app-menu-active-bg);
   box-shadow: 0 4px 12px rgba(240, 147, 251, 0.3);
   font-weight: 600;
 }
@@ -382,7 +378,7 @@ onUnmounted(() => {
   transform: translateY(-50%);
   width: 4px;
   height: 60%;
-  background: linear-gradient(180deg, #f093fb 0%, #f5576c 100%);
+  background: var(--app-menu-active-after-bg);
   border-radius: 2px 0 0 2px;
 }
 
@@ -400,7 +396,8 @@ onUnmounted(() => {
 .page-main {
   flex: 1 1 auto;
   min-height: 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--app-main-bg);
+  color: var(--app-main-text);
   border-radius: 20px;
   padding: 24px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
