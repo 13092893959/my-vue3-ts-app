@@ -64,7 +64,7 @@
               </el-radio-group>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveTheme">保存主题设置</el-button>
+              <el-button type="primary" @click="handleSaveTheme">保存主题设置</el-button>
             </el-form-item>
           </el-form>
         </div>
@@ -117,11 +117,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Rank } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
+import { themeConfig, saveTheme, applyTheme } from '../composables/useTheme'
 
 const activeTab = ref('packages')
 const packages = ref<any[]>([])
@@ -146,10 +147,7 @@ const packageRules: FormRules = {
   price: [{ required: true, message: '请输入价格', trigger: 'blur' }]
 }
 
-const themeConfig = reactive({
-  primaryColor: '#667eea',
-  backgroundStyle: 'gradient'
-})
+// themeConfig, saveTheme, applyTheme imported from composable
 
 // 加载套餐
 const loadPackages = async () => {
@@ -280,8 +278,23 @@ const getEntertainmentType = (entertainment: string) => {
   return typeMap[entertainment] || ''
 }
 
-const saveTheme = () => {
-  ElMessage.success('主题设置已保存（演示功能）')
+// 实时预览：修改主题配置时立即生效（不持久化）
+watch(
+  () => ({ ...themeConfig }),
+  (val) => {
+    applyTheme({
+      primaryColor: val.primaryColor,
+      backgroundStyle: val.backgroundStyle as 'light' | 'dark' | 'gradient',
+    })
+  },
+)
+
+const handleSaveTheme = () => {
+  saveTheme({
+    primaryColor: themeConfig.primaryColor,
+    backgroundStyle: themeConfig.backgroundStyle as 'light' | 'dark' | 'gradient',
+  })
+  ElMessage.success('主题设置已保存')
 }
 
 onMounted(() => {

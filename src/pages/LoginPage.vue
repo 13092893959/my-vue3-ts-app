@@ -116,7 +116,7 @@ const login = async () => {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: #f6f7fb;
+  background: var(--app-bg-secondary);
 }
 
 .login-card {

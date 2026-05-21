@@ -307,7 +307,7 @@ loadSnacks()
 }
 
 .content-card {
-  background-color: #fff;
+  background-color: var(--app-bg-elevated);
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
@@ -321,7 +321,7 @@ loadSnacks()
 }
 
 .low-stock {
-  color: red;
+  color: var(--app-danger-color);
 }
 
 .dialog-footer {
