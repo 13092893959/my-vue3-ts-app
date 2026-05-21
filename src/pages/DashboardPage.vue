@@ -406,7 +406,7 @@ const settleCard = async (
     totalAmount: number
     discount: number
     finalAmount: number
-    memberPhone?: string
+    memberId?: number | null
     paymentMethod?: string
     selectedPackageIds?: string[]
     snacks?: any[]
@@ -421,13 +421,13 @@ const settleCard = async (
 
     // 查找会员信息
     let memberInfo = null
-    if (settleData.memberPhone) {
+    if (settleData.memberId) {
       try {
         const membersResponse = await fetch("http://localhost:3000/api/members")
         const membersResult = await membersResponse.json()
         if (membersResult.success) {
           memberInfo = membersResult.data.find(
-            (m: any) => m.phone === settleData.memberPhone,
+            (m: any) => m.id === settleData.memberId,
           )
         }
       } catch (error) {
@@ -464,7 +464,8 @@ const settleCard = async (
       totalAmount: settleData.totalAmount,
       discount: settleData.discount,
       // 新增会员关联信息
-      memberPhone: settleData.memberPhone || null,
+      memberId: settleData.memberId || null,
+      memberPhone: memberInfo?.phone || null,
       memberName: memberInfo?.name || null,
       paymentMethod: settleData.paymentMethod || "cash",
       cardType: memberInfo?.cardType || null,
@@ -621,7 +622,7 @@ const processMemberPayment = async (
 
   // 1. 更新会员信息
   const updateResponse = await fetch(
-    `http://localhost:3000/api/members/${member.phone}`,
+    `http://localhost:3000/api/members/${member.id}`,
     {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -636,6 +637,7 @@ const processMemberPayment = async (
 
   // 2. 创建消费记录
   const consumptionRecord = {
+    memberId: member.id,
     phone: member.phone,
     name: member.name,
     amount: member.cardType === "次卡" ? 0 : amount, // 次卡不计金额

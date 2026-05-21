@@ -158,6 +158,7 @@ import { ElMessage } from "element-plus"
 interface RechargeRecord {
   id: number
   date: string
+  memberId?: number
   phone: string
   name: string
   receiveAmount: number    // 收款金额（客户实际支付的金额）

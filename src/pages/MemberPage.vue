@@ -121,7 +121,7 @@
         />
         <el-table-column label="总收款金额" width="120" align="center">
           <template #default="{ row }">
-            {{ getMemberTotalReceiveAmount(row.phone).toFixed(2) }}元
+            {{ getMemberTotalReceiveAmount(row.id).toFixed(2) }}元
           </template>
         </el-table-column>
         <el-table-column label="消费统计" width="150" align="center">
@@ -206,8 +206,7 @@
         <el-form-item label="手机号" prop="phone">
           <el-input
             v-model="memberForm.phone"
-            placeholder="请输入手机号"
-            :disabled="!!currentMember"
+            placeholder="请输入手机号（选填）"
           />
         </el-form-item>
         <el-form-item label="卡类型" prop="cardType" v-if="!currentMember">
@@ -572,6 +571,7 @@ interface Member {
 interface RechargeRecord {
   id: number
   date: string
+  memberId?: number
   phone: string
   name: string
   receiveAmount: number // 收款金额（客户实际支付的金额）
@@ -582,6 +582,7 @@ interface RechargeRecord {
 interface ConsumptionRecord {
   id: number
   date: string
+  memberId?: number
   phone: string
   name: string
   amount: number
@@ -645,9 +646,9 @@ const renewForm = reactive({
 const consumptionRecords = ref<ConsumptionRecord[]>([])
 
 // 计算会员的总收款金额
-const getMemberTotalReceiveAmount = (phone: string): number => {
+const getMemberTotalReceiveAmount = (memberId: number): number => {
   return rechargeRecords.value
-    .filter((record) => record.phone === phone)
+    .filter((record) => (record as any).memberId === memberId)
     .reduce((sum, record) => sum + (record.receiveAmount || 0), 0)
 }
 
@@ -760,9 +761,7 @@ const exportMembers = () => {
           ? `已用：${member.timesCardUsed || 0}次`
           : "-"
 
-    const totalReceiveAmount = getMemberTotalReceiveAmount(
-      member.phone,
-    ).toFixed(2)
+    const totalReceiveAmount = getMemberTotalReceiveAmount(member.id).toFixed(2)
 
     return [
       index + 1,
@@ -824,9 +823,9 @@ const addMember = async (member: any) => {
 }
 
 // 更新会员
-const updateMember = async (phone: string, updates: any) => {
+const updateMember = async (id: number, updates: any) => {
   try {
-    const response = await fetch(`${API_BASE}/members/${phone}`, {
+    const response = await fetch(`${API_BASE}/members/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(updates),
@@ -887,13 +886,24 @@ const loadConsumptionRecords = async () => {
 
 // ========== 事件处理 ==========
 
+// 自定义验证：姓名和手机号至少填一个
+const validateNameOrPhone = (_rule: any, _value: any, callback: any) => {
+  if (!memberForm.name && !memberForm.phone) {
+    callback(new Error("姓名和手机号至少填写一个"))
+  } else {
+    callback()
+  }
+}
+
 const memberRules: FormRules = {
-  name: [{ required: true, message: "请输入会员姓名", trigger: "blur" }],
+  name: [
+    { validator: validateNameOrPhone, trigger: "blur" },
+  ],
   phone: [
-    { required: true, message: "请输入手机号", trigger: "blur" },
+    { validator: validateNameOrPhone, trigger: "blur" },
     {
       pattern: /^1[3-9]\d{9}$/,
-      message: "请输入正确的手机号",
+      message: "请输入正确的手机号（11位）",
       trigger: "blur",
     },
   ],
@@ -990,8 +1000,9 @@ const handleRenewCard = (row: Member) => {
 // 删除会员
 const handleDeleteMember = async (row: Member) => {
   try {
+    const deleteLabel = row.name || row.phone || `ID:${row.id}`
     await ElMessageBox.confirm(
-      `确定要删除客户"${row.name}"吗？此操作不可恢复！`,
+      `确定要删除客户"${deleteLabel}"吗？此操作不可恢复！`,
       "警告",
       {
         confirmButtonText: "确定",
@@ -1000,7 +1011,7 @@ const handleDeleteMember = async (row: Member) => {
       },
     )
 
-    const response = await fetch(`http://localhost:3000/api/members/${row.phone}`, {
+    const response = await fetch(`http://localhost:3000/api/members/${row.id}`, {
       method: "DELETE",
     })
 
@@ -1024,7 +1035,7 @@ const handleViewMemberRecords = async (row: Member) => {
   // 从后端加载所有消费记录，然后过滤出该会员的记录
   const allRecords = await loadConsumptionRecords()
   consumptionRecords.value = allRecords.filter(
-    (r: ConsumptionRecord) => r.phone === row.phone,
+    (r: any) => r.memberId === row.id || r.phone === row.phone,
   )
   showConsumptionRecordsDialog.value = true
 }
@@ -1034,7 +1045,7 @@ const handleViewMemberRechargeRecords = async (row: Member) => {
   // 从后端加载所有充值记录，然后过滤出该会员的记录
   const allRecords = await loadRechargeRecords()
   rechargeRecords.value = allRecords.filter(
-    (r: RechargeRecord) => r.phone === row.phone,
+    (r: any) => r.memberId === row.id || r.phone === row.phone,
   )
   showRechargeRecordsDialog.value = true
 }
@@ -1068,7 +1079,7 @@ const submitMemberForm = async () => {
         }
         
         // 更新会员信息
-        const result = await updateMember(currentMember.value.phone, memberData)
+        const result = await updateMember(currentMember.value.id, memberData)
         if (result.success) {
           ElMessage.success("客户信息已更新")
           showAddDialog.value = false
@@ -1107,6 +1118,7 @@ const submitMemberForm = async () => {
           const rechargeRecord: RechargeRecord = {
             id: 0,
             date: new Date().toISOString().replace("T", " ").split(".")[0],
+            memberId: result.data?.id,
             phone: memberForm.phone,
             name: memberForm.name,
             receiveAmount: memberForm.receiveAmount,
@@ -1165,7 +1177,7 @@ const submitRecharge = async () => {
   }
 
   // 更新会员信息
-  const updateResult = await updateMember(currentMember.value.phone, updates)
+  const updateResult = await updateMember(currentMember.value.id, updates)
   if (!updateResult.success) {
     ElMessage.error("更新会员信息失败")
     return
@@ -1175,6 +1187,7 @@ const submitRecharge = async () => {
   const rechargeRecord: RechargeRecord = {
     id: 0,
     date: new Date().toISOString().replace("T", " ").split(".")[0],
+    memberId: currentMember.value.id,
     phone: currentMember.value.phone,
     name: currentMember.value.name,
     receiveAmount: rechargeForm.receiveAmount,
@@ -1220,6 +1233,7 @@ const submitRenew = async () => {
     const rechargeRecord: RechargeRecord = {
       id: 0,
       date: new Date().toISOString().replace("T", " ").split(".")[0],
+      memberId: currentMember.value.id,
       phone: currentMember.value.phone,
       name: currentMember.value.name,
       receiveAmount: renewForm.receiveAmount,
@@ -1245,7 +1259,7 @@ const submitRenew = async () => {
     return
   }
 
-  const result = await updateMember(currentMember.value.phone, updates)
+  const result = await updateMember(currentMember.value.id, updates)
   if (result.success) {
     ElMessage.success("续卡成功")
     showRenewDialog.value = false

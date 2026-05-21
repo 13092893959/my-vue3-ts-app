@@ -16,14 +16,16 @@ app.use(express.json())
 // 在生产环境下提供前端静态文件
 const isProduction = process.env.NODE_ENV === 'production'
 if (isProduction) {
-  const frontendPath = path.join(__dirname, '..', 'frontend', 'dist')
+  const frontendPath = path.join(__dirname, '..', 'dist')
   if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath))
-    
+
     // 所有非API请求都返回index.html（支持Vue Router的history模式）
-    app.get('*', (req, res) => {
+    app.use((req, res, next) => {
       if (!req.path.startsWith('/api')) {
         res.sendFile(path.join(frontendPath, 'index.html'))
+      } else {
+        next()
       }
     })
   }
@@ -141,20 +143,27 @@ app.post('/api/members', (req, res) => {
   try {
     const members = readData('members')
     const newMember = req.body
-    
-    // 检查手机号是否已存在
-    const existingMember = members.find(m => m.phone === newMember.phone)
-    if (existingMember) {
-      return res.status(400).json({ success: false, message: '该手机号已办理会员卡' })
+
+    // 验证：姓名和手机号至少填一个
+    if (!newMember.name && !newMember.phone) {
+      return res.status(400).json({ success: false, message: '姓名和手机号至少填写一个' })
     }
-    
+
+    // 如果提供了手机号，检查是否已存在
+    if (newMember.phone) {
+      const existingMember = members.find(m => m.phone === newMember.phone)
+      if (existingMember) {
+        return res.status(400).json({ success: false, message: '该手机号已办理会员卡' })
+      }
+    }
+
     // 生成唯一ID
     newMember.id = Date.now()
     newMember.createTime = new Date().toISOString().replace('T', ' ').split('.')[0]
-    
+
     members.push(newMember)
     writeData('members', members)
-    
+
     res.json({ success: true, data: newMember })
   } catch (error) {
     res.status(500).json({ success: false, message: '添加会员失败' })
@@ -162,24 +171,24 @@ app.post('/api/members', (req, res) => {
 })
 
 // 更新会员
-app.put('/api/members/:phone', (req, res) => {
+app.put('/api/members/:id', (req, res) => {
   try {
     const members = readData('members')
-    const { phone } = req.params
+    const { id } = req.params
     const updates = req.body
-    
-    const memberIndex = members.findIndex(m => m.phone === phone)
+
+    const memberIndex = members.findIndex(m => String(m.id) === String(id))
     if (memberIndex === -1) {
       return res.status(404).json({ success: false, message: '会员不存在' })
     }
-    
-    // 更新会员信息
+
+    // 更新会员信息（允许修改手机号）
     members[memberIndex] = {
       ...members[memberIndex],
       ...updates,
-      phone // 保持手机号不变
+      id: members[memberIndex].id, // 保持ID不变
     }
-    
+
     writeData('members', members)
     res.json({ success: true, data: members[memberIndex] })
   } catch (error) {
@@ -188,19 +197,19 @@ app.put('/api/members/:phone', (req, res) => {
 })
 
 // 删除会员
-app.delete('/api/members/:phone', (req, res) => {
+app.delete('/api/members/:id', (req, res) => {
   try {
     const members = readData('members')
-    const { phone } = req.params
-    
-    const memberIndex = members.findIndex(m => m.phone === phone)
+    const { id } = req.params
+
+    const memberIndex = members.findIndex(m => String(m.id) === String(id))
     if (memberIndex === -1) {
       return res.status(404).json({ success: false, message: '会员不存在' })
     }
-    
+
     members.splice(memberIndex, 1)
     writeData('members', members)
-    
+
     res.json({ success: true, message: '删除成功' })
   } catch (error) {
     res.status(500).json({ success: false, message: '删除会员失败' })

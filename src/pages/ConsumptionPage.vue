@@ -151,6 +151,7 @@ import { ElMessage } from "element-plus"
 interface ConsumptionRecord {
   id: number
   date: string
+  memberId?: number
   phone: string
   name: string
   amount: number

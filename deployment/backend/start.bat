@@ -54,6 +54,7 @@ if not exist "D:\data\baiwancheli" (
     echo.
 )
 
+set NODE_ENV=production
 echo [3/3] 启动服务...
 echo.
 echo ====================================

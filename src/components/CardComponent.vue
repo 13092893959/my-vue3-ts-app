@@ -234,7 +234,7 @@
       <el-form :model="settleForm" label-width="100px" style="margin-top: 16px">
         <el-form-item label="关联会员">
           <el-select
-            v-model="settleForm.memberPhone"
+            v-model="settleForm.memberId"
             placeholder="输入手机号或姓名搜索会员（可选）"
             filterable
             clearable
@@ -244,9 +244,9 @@
           >
             <el-option
               v-for="member in filteredMembers"
-              :key="member.phone"
-              :label="`${member.name} (${member.phone})`"
-              :value="member.phone"
+              :key="member.id"
+              :label="`${member.name || '(无名)'} ${member.phone ? '(' + member.phone + ')' : ''}`"
+              :value="member.id"
             >
               <div
                 style="
@@ -1019,7 +1019,7 @@ const emit = defineEmits<{
       totalAmount: number
       discount: number
       finalAmount: number
-      memberPhone?: string
+      memberId?: number | null
       paymentMethod?: string
       selectedPackageIds?: string[]
       snacks?: any[]
@@ -1102,7 +1102,7 @@ const settleForm = ref({
   totalAmount: 0, // 总金额（套餐总价）
   discount: 100, // 默认100%（无折扣）
   finalAmount: 0, // 最终金额（应用折扣后）
-  memberPhone: "", // 会员手机号
+  memberId: null as number | null, // 会员ID
   paymentMethod: "member_balance", // 支付方式：member_balance/package
   selectedPackageIds: [] as string[], // 选中的套餐ID列表（多选）
 })
@@ -1597,7 +1597,7 @@ const openSettleDialog = async () => {
   // 重置表单为默认值
   settleForm.value.totalAmount = 0
   settleForm.value.discount = 100
-  settleForm.value.memberPhone = ""
+  settleForm.value.memberId = null
   settleForm.value.paymentMethod = "member_balance"
   settleForm.value.selectedPackageIds = []
   selectedMember.value = null
@@ -1621,9 +1621,9 @@ const loadMembers = async () => {
 }
 
 // 会员选择变化
-const handleMemberSelect = (phone: string) => {
+const handleMemberSelect = (id: number) => {
   selectedMember.value =
-    availableMembers.value.find((m) => m.phone === phone) || null
+    availableMembers.value.find((m) => m.id === id) || null
 
   // 如果选择了会员且有余额/次数，默认使用会员支付
   if (selectedMember.value && canUseMemberBalance.value) {
@@ -1675,7 +1675,7 @@ const confirmSettle = () => {
     totalAmount: settleForm.value.totalAmount,
     discount: settleForm.value.discount,
     finalAmount: settleForm.value.finalAmount,
-    memberPhone: settleForm.value.memberPhone,
+    memberId: settleForm.value.memberId,
     paymentMethod: settleForm.value.paymentMethod,
     selectedPackageIds: settleForm.value.selectedPackageIds,
     snacks: currentOrder.value?.snacks || [],

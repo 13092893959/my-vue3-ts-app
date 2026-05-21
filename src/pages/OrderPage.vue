@@ -322,6 +322,7 @@ interface Order {
   status: "completed" | "in_progress"
   createTime: string
   // 新增会员关联字段
+  memberId?: number
   memberPhone?: string
   memberName?: string
   paymentMethod?: string
