@@ -7,7 +7,9 @@ const DATA_FILES = {
   rechargeRecords: path.join(DATA_DIR, 'recharge-records.json'),
   consumptionRecords: path.join(DATA_DIR, 'consumption-records.json'),
   tables: path.join(DATA_DIR, 'tables.json'),
-  orders: path.join(DATA_DIR, 'orders.json')
+  orders: path.join(DATA_DIR, 'orders.json'),
+  snacks: path.join(DATA_DIR, 'snacks.json'),
+  packages: path.join(DATA_DIR, 'packages.json')
 }
 
 // 确保数据目录存在
@@ -41,8 +43,16 @@ const initialTables = Array.from({ length: 6 }, (_, index) => ({
   isBooked: false,
   bookingInfo: null,
   isDisabled: false,
-  startTimestamp: null // 开始计时的时间戳
+  startTimestamp: null, // 开始计时的时间戳
+  currentOrderRemark: "", // 当前订单备注
+  currentOrderSnacks: [] // 当前订单零食列表
 }))
+
+// 初始零食数据（为空，不设置默认数据）
+const initialSnacks = []
+
+// 初始套餐数据（为空，不设置默认数据）
+const initialPackages = []
 
 // 写入各个数据文件
 try {
@@ -67,12 +77,21 @@ try {
   fs.writeFileSync(DATA_FILES.orders, JSON.stringify(initialOrders, null, 2), 'utf-8')
   console.log('✓ 订单数据已创建:', DATA_FILES.orders)
   
+  // 写入零食数据
+  fs.writeFileSync(DATA_FILES.snacks, JSON.stringify(initialSnacks, null, 2), 'utf-8')
+  console.log('✓ 零食数据已创建:', DATA_FILES.snacks)
+  
+  // 写入套餐数据
+  fs.writeFileSync(DATA_FILES.packages, JSON.stringify(initialPackages, null, 2), 'utf-8')
+  console.log('✓ 套餐数据已创建:', DATA_FILES.packages)
+  
   console.log('\n初始化完成！')
   console.log('  会员数量:', initialMembers.length)
   console.log('  充值记录数量:', initialRechargeRecords.length)
   console.log('  消费记录数量:', initialConsumptionRecords.length)
   console.log('  桌台数量:', initialTables.length)
   console.log('  订单数量:', initialOrders.length)
+  console.log('  零食数量:', initialSnacks.length)
 } catch (error) {
   console.error('✗ 创建初始数据失败:', error)
 }
