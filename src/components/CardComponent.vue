@@ -55,14 +55,30 @@
 
     <!-- 使用中模式：显示计时器 -->
     <div v-if="card.isInUse" class="timer-banner">
-      <div class="timer-title">计时中</div>
-      <div class="timer-value">{{ formatTime(elapsedTime) }}</div>
-      <div class="timer-sub">{{ card.currentUsers }}人</div>
+      <div class="timer-title">计时中 · {{ card.currentUsers }}人</div>
       <div class="timer-entertainment" v-if="card.currentEntertainment">
         {{ card.currentEntertainment }}
       </div>
-      <div class="timer-start-time" v-if="card.startTimestamp">
-        开始：{{ formatStartTime(card.startTimestamp) }}
+      <!-- 多批次计时显示 -->
+      <div
+        v-if="card.timerSessions && card.timerSessions.length > 0"
+        class="timer-sessions"
+      >
+        <div
+          v-for="session in card.timerSessions"
+          :key="session.id"
+          class="timer-session-row"
+        >
+          <span class="session-label">{{ session.label }}</span>
+          <span class="session-time">{{ formatTime(getSessionElapsed(session)) }}</span>
+        </div>
+      </div>
+      <!-- 向后兼容：无 timerSessions 时显示单计时器 -->
+      <div v-else-if="card.startTimestamp" class="timer-single">
+        <div class="timer-value">{{ formatTime(elapsedTime) }}</div>
+        <div class="timer-start-time">
+          开始：{{ formatStartTime(card.startTimestamp) }}
+        </div>
       </div>
     </div>
 
@@ -127,10 +143,10 @@
         </el-button>
       </div>
 
-      <!-- 使用中模式：拼桌、订单和结束计时按钮 -->
+      <!-- 使用中模式：加人、订单和结束计时按钮 -->
       <div v-else class="action-row-in-use">
-        <el-button type="success" size="default" @click.stop="shareTable">
-          拼桌
+        <el-button type="success" size="default" @click.stop="openAddPersonDialog">
+          加人
         </el-button>
         <el-button type="info" size="default" @click.stop="viewOrders">
           订单
@@ -187,6 +203,40 @@
     <template #footer>
       <el-button @click="showTimerDialog = false">取消</el-button>
       <el-button type="primary" @click="confirmStartTimer">确认开始</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 加人对话框 -->
+  <el-dialog
+    v-model="showAddPersonDialog"
+    title="中途加人"
+    width="500px"
+    append-to-body
+    @close="resetAddPersonForm"
+  >
+    <el-form :model="addPersonForm" label-width="100px">
+      <el-form-item label="加人人数">
+        <el-input-number
+          v-model="addPersonForm.users"
+          :min="1"
+          :max="card.capacity - card.currentUsers"
+          controls-position="right"
+          style="width: 100%"
+        />
+      </el-form-item>
+      <el-form-item label="开始时间">
+        <el-time-picker
+          v-model="addPersonForm.startTime"
+          placeholder="默认为当前时间"
+          format="HH:mm:ss"
+          value-format="HH:mm:ss"
+          style="width: 100%"
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="showAddPersonDialog = false">取消</el-button>
+      <el-button type="primary" @click="confirmAddPerson">确认加人</el-button>
     </template>
   </el-dialog>
 
@@ -578,22 +628,27 @@
               ¥{{ (row.price * row.quantity).toFixed(2) }}
             </template>
           </el-table-column>
-          <!-- 拆单模式下显示所属分组列 -->
-          <el-table-column v-if="useSplitBill" label="所属分组" width="140" align="center">
-            <template #default="{ $index }">
-              <el-select
-                :model-value="snackGroupAssignment[$index]"
-                size="small"
-                style="width: 120px"
-                @change="(v) => assignSnackToGroup($index, v)"
-              >
-                <el-option
+          <!-- 拆单模式下显示分组数量分配列 -->
+          <el-table-column v-if="useSplitBill" label="分组分配" :min-width="settleGroups.length * 80 + 20" align="center">
+            <template #default="{ row, $index }">
+              <div class="snack-group-quantities">
+                <span
                   v-for="group in settleGroups"
                   :key="group.id"
-                  :label="group.label"
-                  :value="group.id"
-                />
-              </el-select>
+                  class="snack-qty-item"
+                >
+                  <span class="snack-qty-label">{{ group.label.split('(')[0] }}</span>
+                  <el-input-number
+                    :model-value="(snackGroupAssignment[$index] && snackGroupAssignment[$index][group.id]) || 0"
+                    :min="0"
+                    :max="row.quantity"
+                    size="small"
+                    controls-position="right"
+                    style="width: 60px"
+                    @change="(v) => assignSnackToGroup($index, group.id, v || 0)"
+                  />
+                </span>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="操作" min-width="80" align="center">
@@ -1198,6 +1253,12 @@ type CardProps = {
     currentEntertainment?: string // 当前选择的娱乐类型（单选）
     currentOrderRemark?: string // 当前订单备注
     currentOrderSnacks?: any[] // 当前订单零食列表
+    timerSessions?: Array<{
+      id: string
+      users: number
+      startTimestamp: number
+      label: string
+    }>
   }
 }
 
@@ -1211,7 +1272,7 @@ interface SettleGroup {
   discount: number
   finalAmount: number
   paymentMethod: string
-  assignedSnackIndices: number[]
+  assignedSnacks: Record<number, number>  // snackIndex → allocated quantity
 }
 
 const props = defineProps<CardProps>()
@@ -1242,6 +1303,7 @@ const emit = defineEmits<{
     },
   ): void
   (e: "settle-multi", id: string, groups: SettleGroup[]): void
+  (e: "add-person", id: string, data: { users: number; startTimestamp: number }): void
   (e: "booking", id: string, bookingData: any): void
   (e: "cancel-booking", id: string): void
   (e: "edit", id: string): void
@@ -1253,6 +1315,7 @@ const emit = defineEmits<{
 
 const remainingTime = ref(0)
 const elapsedTime = ref(0) // 正计时的 elapsed time
+const timerTick = ref(0) // 用于触发多 session 计时器模板重渲染
 let timer: number | null = null
 
 const getElapsedSeconds = () => {
@@ -1264,12 +1327,15 @@ const getElapsedSeconds = () => {
 
 const updateElapsed = () => {
   elapsedTime.value = getElapsedSeconds()
+  timerTick.value++ // 触发模板重渲染，使 getSessionElapsed 重新计算
 }
 
 const initTimer = () => {
   updateElapsed()
   if (timer) clearInterval(timer)
-  timer = window.setInterval(updateElapsed, 1000)
+  timer = window.setInterval(() => {
+    updateElapsed()
+  }, 1000)
 }
 
 const stopTimer = () => {
@@ -1299,6 +1365,13 @@ const showDetailDialog = ref(false)
 const showBookingDialog = ref(false)
 const showSettleDialog = ref(false) // 结算确认对话框
 const showOrdersDialog = ref(false) // 订单详情对话框
+const showAddPersonDialog = ref(false) // 加人对话框
+
+// 加人表单
+const addPersonForm = ref({
+  users: 1,
+  startTime: "",
+})
 
 // 订单列表
 const tableOrders = ref<any[]>([])
@@ -1360,22 +1433,39 @@ const totalAssignedUsers = computed(() =>
   settleGroups.value.reduce((sum, g) => sum + g.users, 0),
 )
 
-const snackGroupAssignment = ref<Record<number, string>>({}) // snackIndex -> groupId
+const snackGroupAssignment = ref<Record<number, Record<string, number>>>({}) // snackIndex -> { groupId: quantity }
+const settleDialogInitialized = ref(false)
 
-const createDefaultGroup = (): SettleGroup => ({
-  id: `group-${Date.now()}`,
-  label: `分组 1 (${props.card.currentUsers}人)`,
-  users: props.card.currentUsers,
-  memberId: null,
-  selectedPackageIds: [],
-  totalAmount: 0,
-  discount: 100,
-  finalAmount: 0,
-  paymentMethod: "member_balance",
-  assignedSnackIndices: props.card.currentOrderSnacks
-    ? props.card.currentOrderSnacks.map((_: any, i: number) => i)
-    : [],
-})
+// 获取当前零食数据（优先 local ref，fallback 到 prop）
+const getSnacks = () => {
+  return (currentOrder.value?.snacks && currentOrder.value.snacks.length > 0)
+    ? currentOrder.value.snacks
+    : (props.card.currentOrderSnacks || [])
+}
+
+const getSnackByIndex = (idx: number) => {
+  return getSnacks()[idx] || null
+}
+
+const createDefaultGroup = (): SettleGroup => {
+  const snacks = getSnacks()
+  const assigned: Record<number, number> = {}
+  snacks.forEach((_: any, i: number) => {
+    assigned[i] = snacks[i].quantity
+  })
+  return {
+    id: `group-${Date.now()}`,
+    label: `分组 1 (${props.card.currentUsers}人)`,
+    users: props.card.currentUsers,
+    memberId: null,
+    selectedPackageIds: [],
+    totalAmount: 0,
+    discount: 100,
+    finalAmount: 0,
+    paymentMethod: "member_balance",
+    assignedSnacks: assigned,
+  }
+}
 
 // 根据娱乐类型返回标签颜色类型
 const getEntertainmentTagType = (
@@ -1494,6 +1584,51 @@ const confirmStartTimer = () => {
 
 const shareTable = () => {
   emit("share", props.card.id)
+}
+
+// 加人相关函数
+const openAddPersonDialog = () => {
+  addPersonForm.value = { users: 1, startTime: null as string | null }
+  showAddPersonDialog.value = true
+}
+
+const resetAddPersonForm = () => {
+  addPersonForm.value = { users: 1, startTime: null as string | null }
+}
+
+const confirmAddPerson = () => {
+  if (addPersonForm.value.users <= 0) {
+    ElMessage.warning("请输入加人人数")
+    return
+  }
+  const remaining =
+    props.card.capacity - (props.card.currentUsers || 0)
+  if (addPersonForm.value.users > remaining) {
+    ElMessage.warning(`桌台最多还能加 ${remaining} 人`)
+    return
+  }
+  let startTimestamp: number
+  if (addPersonForm.value.startTime) {
+    const now = new Date()
+    const [hours, minutes, seconds] = addPersonForm.value.startTime
+      .split(":")
+      .map(Number)
+    now.setHours(hours, minutes, seconds, 0)
+    startTimestamp = now.getTime()
+  } else {
+    startTimestamp = Date.now()
+  }
+  emit("add-person", props.card.id, {
+    users: addPersonForm.value.users,
+    startTimestamp,
+  })
+  showAddPersonDialog.value = false
+}
+
+// 获取某个 session 的已过时间
+const getSessionElapsed = (session: { startTimestamp: number }) => {
+  void timerTick.value // 建立响应式依赖，每秒重算
+  return Math.max(0, Math.round((Date.now() - session.startTimestamp) / 1000))
 }
 
 const viewOrders = async () => {
@@ -1836,24 +1971,55 @@ const calculateFinalAmount = () => {
 
 // 打开结算对话框并初始化计算
 const openSettleDialog = async () => {
-  // 重置表单为默认值
+  // 重置单组模式表单（向后兼容）
   settleForm.value.totalAmount = 0
   settleForm.value.discount = 100
   settleForm.value.memberId = null
   settleForm.value.paymentMethod = "member_balance"
   settleForm.value.selectedPackageIds = []
   selectedMember.value = null
-  // 重置拆单状态
-  useSplitBill.value = false
-  settleGroups.value = [createDefaultGroup()]
-  activeGroupId.value = settleGroups.value[0].id
-  snackGroupAssignment.value = {}
-  // 默认所有零食归第一组
-  if (currentOrder.value?.snacks) {
-    currentOrder.value.snacks.forEach((_: any, i: number) => {
-      snackGroupAssignment.value[i] = settleGroups.value[0].id
-    })
+
+  // 首次打开才初始化分组，之后保留用户已填数据
+  if (!settleDialogInitialized.value) {
+    useSplitBill.value = false
+    snackGroupAssignment.value = {}
+    const snacks = getSnacks()
+
+    // 如果有 timerSessions，按批次预填充分组
+    if (props.card.timerSessions && props.card.timerSessions.length > 0) {
+      const sessions = props.card.timerSessions
+      settleGroups.value = sessions.map((s, i) => ({
+        id: `group-${Date.now()}-${i}`,
+        label: `分组 ${i + 1} (${s.users}人)`,
+        users: s.users,
+        memberId: null,
+        selectedPackageIds: [],
+        totalAmount: 0,
+        discount: 100,
+        finalAmount: 0,
+        paymentMethod: "member_balance" as string,
+        assignedSnacks: {} as Record<number, number>,
+      }))
+      // 如果有多个批次，自动开启拆单
+      if (sessions.length > 1) {
+        useSplitBill.value = true
+      }
+      // 默认零食全归第一组
+      const firstGroupId = settleGroups.value[0].id
+      snacks.forEach((s: any, i: number) => {
+        snackGroupAssignment.value[i] = { [firstGroupId]: s.quantity }
+      })
+    } else {
+      settleGroups.value = [createDefaultGroup()]
+      const firstGroupId = settleGroups.value[0].id
+      snacks.forEach((_: any, i: number) => {
+        snackGroupAssignment.value[i] = { [firstGroupId]: snacks[i].quantity }
+      })
+    }
+    activeGroupId.value = settleGroups.value[0].id
+    settleDialogInitialized.value = true
   }
+
   // 加载会员列表和套餐列表
   await Promise.all([loadMembers(), loadPackages()])
   // 打开对话框
@@ -1943,7 +2109,7 @@ const addGroup = () => {
     discount: 100,
     finalAmount: 0,
     paymentMethod: "member_balance",
-    assignedSnackIndices: [],
+    assignedSnacks: {},
   }
   settleGroups.value.push(newGroup)
   activeGroupId.value = newGroup.id
@@ -2007,14 +2173,15 @@ const toggleSplitBill = (val: boolean) => {
       settleGroups.value = [createDefaultGroup()]
       activeGroupId.value = settleGroups.value[0].id
     }
-    // 初始化零食分配（默认归第一组）
-    if (currentOrder.value?.snacks) {
+    // 初始化零食分配（默认归第一组，全量分配）
+    const snacks = getSnacks()
+    if (snacks.length > 0) {
       const firstGroupId = settleGroups.value[0].id
-      currentOrder.value.snacks.forEach((_: any, i: number) => {
+      snacks.forEach((snack: any, i: number) => {
         if (!(i in snackGroupAssignment.value)) {
           snackGroupAssignment.value = {
             ...snackGroupAssignment.value,
-            [i]: firstGroupId,
+            [i]: { [firstGroupId]: snack.quantity },
           }
         }
       })
@@ -2024,10 +2191,14 @@ const toggleSplitBill = (val: boolean) => {
 
 const calcGroupFinal = (group: SettleGroup) => {
   const discountRate = group.discount / 100
-  const snackTotal = group.assignedSnackIndices.reduce((sum, idx) => {
-    const snack = currentOrder.value?.snacks?.[idx]
-    return sum + (snack ? snack.price * snack.quantity : 0)
-  }, 0)
+  let snackTotal = 0
+  Object.entries(group.assignedSnacks).forEach(([idxStr, qty]) => {
+    const idx = parseInt(idxStr)
+    const snack = getSnackByIndex(idx)
+    if (snack) {
+      snackTotal += snack.price * qty
+    }
+  })
   group.finalAmount = group.totalAmount * discountRate + snackTotal
 }
 
@@ -2054,16 +2225,26 @@ const updateGroupPayment = (groupId: string, method: string) => {
   }
 }
 
-const assignSnackToGroup = (snackIndex: number, groupId: string) => {
+const assignSnackToGroup = (snackIndex: number, groupId: string, quantity: number) => {
+  const current = { ...(snackGroupAssignment.value[snackIndex] || {}) }
+  if (quantity <= 0) {
+    delete current[groupId]
+  } else {
+    current[groupId] = quantity
+  }
   snackGroupAssignment.value = {
     ...snackGroupAssignment.value,
-    [snackIndex]: groupId,
+    [snackIndex]: current,
   }
   // Recalc all groups since snack assignment changed
   settleGroups.value.forEach((g) => {
-    g.assignedSnackIndices = Object.entries(snackGroupAssignment.value)
-      .filter(([, gid]) => gid === g.id)
-      .map(([idx]) => parseInt(idx))
+    g.assignedSnacks = {}
+    Object.entries(snackGroupAssignment.value).forEach(([idxStr, alloc]) => {
+      const qty = alloc[g.id]
+      if (qty && qty > 0) {
+        g.assignedSnacks[parseInt(idxStr)] = qty
+      }
+    })
     calcGroupFinal(g)
   })
 }
@@ -2264,6 +2445,42 @@ onUnmounted(() => {
   font-size: 11px;
   opacity: 0.85;
   line-height: 1;
+}
+
+.timer-sessions {
+  margin-top: 4px;
+}
+
+.timer-session-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.session-label {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.session-time {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: "Courier New", monospace;
+  letter-spacing: 0.06em;
+}
+
+.timer-single {
+  margin-top: 4px;
+}
+
+.timer-single .timer-value {
+  font-size: 30px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  font-family: "Courier New", monospace;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 /* 结算对话框样式 */
@@ -2690,5 +2907,24 @@ onUnmounted(() => {
   justify-content: flex-end;
   align-items: center;
   gap: 4px;
+}
+
+.snack-group-quantities {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.snack-qty-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.snack-qty-label {
+  font-size: 10px;
+  color: #909399;
 }
 </style>

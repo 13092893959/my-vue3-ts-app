@@ -45,7 +45,8 @@ const initialTables = Array.from({ length: 6 }, (_, index) => ({
   isDisabled: false,
   startTimestamp: null, // 开始计时的时间戳
   currentOrderRemark: "", // 当前订单备注
-  currentOrderSnacks: [] // 当前订单零食列表
+  currentOrderSnacks: [], // 当前订单零食列表
+  timerSessions: [] // 计时批次
 }))
 
 // 初始零食数据（为空，不设置默认数据）

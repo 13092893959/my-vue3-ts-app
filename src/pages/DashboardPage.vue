@@ -16,6 +16,7 @@
               <CardComponent
                 :card="card"
                 @start="startCardTimer"
+                @add-person="addPersonToCard"
                 @share="shareCard"
                 @orders="viewOrders"
                 @settle="settleCard"
@@ -270,8 +271,9 @@ const createDefaultCards = () => {
     isBooked: false,
     bookingInfo: null,
     isDisabled: false,
-    currentOrderRemark: "", // 当前订单备注
-    currentOrderSnacks: [], // 当前订单零食列表
+    currentOrderRemark: "",
+    currentOrderSnacks: [],
+    timerSessions: [],
   }))
 }
 
@@ -341,6 +343,7 @@ const submitForm = async () => {
             isBooked: false,
             bookingInfo: null,
             isDisabled: false,
+            timerSessions: [],
           })
           ElMessage.success("桌台添加成功")
         }
@@ -395,8 +398,41 @@ const startCardTimer = (
     card.currentEntertainment = data.entertainment
     card.currentUsers = data.currentUsers
     card.startTimestamp = data.startTimestamp
+    // 创建第一个 timer session
+    card.timerSessions = [{
+      id: `session-${Date.now()}`,
+      users: data.currentUsers,
+      startTimestamp: data.startTimestamp,
+      label: `批次 1 (${data.currentUsers}人)`,
+    }]
     ElMessage.success(
       `卡片 ${id} 开始计时，娱乐类型：${data.entertainment}，人数：${data.currentUsers}`,
+    )
+  }
+}
+
+const addPersonToCard = (
+  id: string,
+  data: { users: number; startTimestamp: number },
+) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (card) {
+    const sessions = card.timerSessions || []
+    const sessionIdx = sessions.length + 1
+    sessions.push({
+      id: `session-${Date.now()}`,
+      users: data.users,
+      startTimestamp: data.startTimestamp,
+      label: `批次 ${sessionIdx} (${data.users}人)`,
+    })
+    card.timerSessions = sessions
+    card.currentUsers += data.users
+    // 如果加人时间早于最早计时，更新 startTimestamp
+    if (data.startTimestamp < card.startTimestamp!) {
+      card.startTimestamp = data.startTimestamp
+    }
+    ElMessage.success(
+      `桌台 ${id} 加人 ${data.users} 人，当前共 ${card.currentUsers} 人`,
     )
   }
 }
@@ -418,7 +454,7 @@ const settleCard = async (
   if (card && card.startTimestamp) {
     const endTime = Date.now()
     const duration = Math.round((endTime - card.startTimestamp) / 1000) // 秒
-    const durationMinutes = Math.ceil(duration / 60) // 分钟，向上取整
+    const groupDurationMinutes = Math.ceil(duration / 60) // 分钟，向上取整
 
     // 查找会员信息
     let memberInfo = null
@@ -460,7 +496,7 @@ const settleCard = async (
       users: card.currentUsers,
       startTime: card.startTimestamp,
       endTime: endTime,
-      duration: durationMinutes,
+      duration: groupDurationMinutes,
       amount: settleData.finalAmount,
       totalAmount: settleData.totalAmount,
       discount: settleData.discount,
@@ -510,7 +546,7 @@ const settleCard = async (
           memberInfo,
           settleData.finalAmount,
           card.currentEntertainment || "",
-          durationMinutes,
+          groupDurationMinutes,
         )
       }
 
@@ -524,7 +560,8 @@ const settleCard = async (
       card.startTimestamp = null
       card.initialMinutes = undefined
       card.currentOrderRemark = "" // 清除订单备注
-      card.currentOrderSnacks = [] // 清除订单零食
+      card.currentOrderSnacks = []
+      card.timerSessions = []
       saveCards()
 
       ElMessage.success(
@@ -548,7 +585,7 @@ interface SettleGroup {
   discount: number
   finalAmount: number
   paymentMethod: string
-  assignedSnackIndices: number[]
+  assignedSnacks: Record<number, number>  // snackIndex → allocated quantity
 }
 
 const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
@@ -556,15 +593,20 @@ const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
   if (!card || !card.startTimestamp) return
 
   const endTime = Date.now()
-  const duration = Math.round((endTime - card.startTimestamp) / 1000)
-  const durationMinutes = Math.ceil(duration / 60)
   const batchId = `BATCH-${Date.now()}`
   const allTableSnacks = card.currentOrderSnacks || []
+  const sessions = card.timerSessions || []
 
   // 收集所有分组分配的零食（用于统一扣库存）
   const allAssignedSnacks: any[] = []
 
-  for (const group of groups) {
+  for (let gi = 0; gi < groups.length; gi++) {
+    const group = groups[gi]
+    // 按分组索引匹配 timer session，获取该批次的开始时间
+    const session = sessions[gi]
+    const groupStartTime = session ? session.startTimestamp : card.startTimestamp!
+    const groupDuration = Math.round((endTime - groupStartTime) / 1000)
+    const groupDurationMinutes = Math.ceil(groupDuration / 60)
     // 查找该分组的会员信息
     let memberInfo = null
     if (group.memberId) {
@@ -597,19 +639,24 @@ const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
       }
     }
 
-    // 该分组的零食
-    const groupSnacks = group.assignedSnackIndices
-      .map((idx) => allTableSnacks[idx])
-      .filter(Boolean)
+    // 该分组的零食（按分配数量拆分）
+    const groupSnacks: any[] = []
+    Object.entries(group.assignedSnacks).forEach(([idxStr, qty]) => {
+      const idx = parseInt(idxStr)
+      const snack = allTableSnacks[idx]
+      if (snack && qty > 0) {
+        groupSnacks.push({ ...snack, quantity: qty })
+      }
+    })
 
     const orderData: any = {
       tableId: card.id,
       tableCode: card.id,
       entertainment: card.currentEntertainment || "",
       users: group.users,
-      startTime: card.startTimestamp,
+      startTime: groupStartTime,
       endTime: endTime,
-      duration: durationMinutes,
+      duration: groupDurationMinutes,
       amount: group.finalAmount,
       totalAmount: group.totalAmount,
       discount: group.discount,
@@ -656,7 +703,7 @@ const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
           memberInfo,
           group.finalAmount,
           card.currentEntertainment || "",
-          durationMinutes,
+          groupDurationMinutes,
         )
       }
 
