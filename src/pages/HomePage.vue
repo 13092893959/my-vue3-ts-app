@@ -7,7 +7,7 @@
             <span class="logo-emoji">🎮</span>
           </div>
           <div class="header-title-group">
-            <h1>百万撤离主题桌游</h1>
+            <h1>百万撤离主机桌游馆</h1>
             <p class="header-subtitle">Table Game Management System</p>
           </div>
         </div>

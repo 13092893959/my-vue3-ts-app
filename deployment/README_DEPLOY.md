@@ -1,4 +1,4 @@
-# 百万车厘子管理系统 - 部署指南
+# 百万撤离管理系统 - 部署指南
 
 ## 📋 目录
 
@@ -14,15 +14,18 @@
 ## 系统要求
 
 ### 硬件要求
+
 - CPU: 1核及以上
 - 内存: 512MB及以上
 - 硬盘: 100MB可用空间（不含数据文件）
 
 ### 软件要求
+
 - **Node.js**: v18.0.0 或更高版本
 - **操作系统**: Windows 10/11, macOS, Linux
 
 ### 网络要求
+
 - 端口: 3000（默认，可自定义）
 - 如需局域网访问，需配置防火墙
 
@@ -33,11 +36,13 @@
 ### 1. 解压部署包
 
 将 `baiwancheli-deployment.zip` 解压到任意目录，例如：
+
 ```
 D:\baiwancheli\
 ```
 
 解压后的目录结构：
+
 ```
 baiwancheli/
 ├── backend/           # 后端服务
@@ -55,6 +60,7 @@ baiwancheli/
 如果尚未安装Node.js，请访问 [https://nodejs.org/](https://nodejs.org/) 下载并安装 LTS 版本。
 
 验证安装：
+
 ```bash
 node -v
 npm -v
@@ -78,6 +84,7 @@ npm start
 ```
 
 看到以下提示表示启动成功：
+
 ```
 服务器运行在 http://localhost:3000
 ```
@@ -85,11 +92,13 @@ npm start
 ### 5. 访问系统
 
 打开浏览器访问：
+
 ```
 http://localhost:3000
 ```
 
 默认登录账号：
+
 - 用户名：`admin`
 - 密码：`123456`
 
@@ -110,6 +119,7 @@ node -v
 #### 1.2 创建数据目录（可选）
 
 系统默认将数据存储在 `D:/data/baiwancheli/`，你可以：
+
 - 保持默认路径（推荐）
 - 或自定义路径（见[配置说明](#配置说明)）
 
@@ -138,6 +148,7 @@ npm run init
 ```
 
 这将创建以下文件：
+
 - `D:/data/baiwancheli/members.json` - 会员数据
 - `D:/data/baiwancheli/recharge-records.json` - 充值记录
 - `D:/data/baiwancheli/consumption-records.json` - 消费记录
@@ -151,6 +162,7 @@ npm start
 ```
 
 服务启动后，你将看到：
+
 ```
 ✓ 服务器运行在 http://localhost:3000
 ✓ 数据目录: D:/data/baiwancheli
@@ -176,22 +188,24 @@ npm start
 
 系统支持以下环境变量配置：
 
-| 变量名 | 说明 | 默认值 | 示例 |
-|--------|------|--------|------|
-| `PORT` | 服务端口 | `3000` | `set PORT=3001` |
+| 变量名     | 说明         | 默认值                | 示例                      |
+| ---------- | ------------ | --------------------- | ------------------------- |
+| `PORT`     | 服务端口     | `3000`                | `set PORT=3001`           |
 | `DATA_DIR` | 数据存储目录 | `D:/data/baiwancheli` | `set DATA_DIR=E:\my-data` |
-| `NODE_ENV` | 运行环境 | `production` | 无需设置 |
+| `NODE_ENV` | 运行环境     | `production`          | 无需设置                  |
 
 ### 修改端口
 
 如果3000端口被占用，可以修改端口：
 
 **Windows:**
+
 ```bash
 set PORT=3001 && npm start
 ```
 
 **Linux/Mac:**
+
 ```bash
 PORT=3001 npm start
 ```
@@ -199,11 +213,13 @@ PORT=3001 npm start
 ### 修改数据目录
 
 **Windows:**
+
 ```bash
 set DATA_DIR=E:\my-data && npm start
 ```
 
 **Linux/Mac:**
+
 ```bash
 DATA_DIR=/home/user/data npm start
 ```
@@ -216,7 +232,7 @@ DATA_DIR=/home/user/data npm start
 
 1. 打开"任务计划程序"
 2. 点击"创建基本任务"
-3. 名称：`百万车厘子管理系统`
+3. 名称：`百万撤离管理系统`
 4. 触发器：选择"当用户登录时"
 5. 操作：选择"启动程序"
    - 程序或脚本：`cmd.exe`
@@ -235,6 +251,7 @@ npm start
 ```
 
 将此快捷方式放入"启动"文件夹：
+
 ```
 C:\Users\你的用户名\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
 ```
@@ -248,16 +265,19 @@ C:\Users\你的用户名\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\S
 **解决方案：**
 
 1. 查找占用端口的进程：
+
 ```bash
 netstat -ano | findstr :3000
 ```
 
 2. 结束该进程（假设PID为12345）：
+
 ```bash
 taskkill /F /PID 12345
 ```
 
 3. 或者修改端口：
+
 ```bash
 set PORT=3001 && npm start
 ```
@@ -267,6 +287,7 @@ set PORT=3001 && npm start
 **解决方案：**
 
 重新安装依赖：
+
 ```bash
 cd D:\baiwancheli\backend
 npm install --production
@@ -277,6 +298,7 @@ npm install --production
 默认位置：`D:/data/baiwancheli/`
 
 包含以下JSON文件：
+
 - `members.json` - 会员数据
 - `recharge-records.json` - 充值记录
 - `consumption-records.json` - 消费记录
@@ -288,12 +310,14 @@ npm install --production
 ### Q4: 如何备份数据？
 
 **手动备份：**
+
 ```bash
 # 复制数据目录
 xcopy D:\data\baiwancheli D:\backup\baiwancheli_%date:~0,4%%date:~5,2%%date:~8,2% /E /I
 ```
 
 **自动备份脚本：** 创建 `backup.bat`：
+
 ```batch
 @echo off
 set BACKUP_DIR=D:\backup\baiwancheli_%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%
@@ -305,6 +329,7 @@ pause
 ### Q5: 如何在局域网内访问？
 
 1. 查看本机IP地址：
+
 ```bash
 ipconfig
 ```
@@ -312,6 +337,7 @@ ipconfig
 2. 找到IPv4地址，例如：`192.168.1.100`
 
 3. 其他设备访问：
+
 ```
 http://192.168.1.100:3000
 ```
@@ -342,11 +368,13 @@ http://192.168.1.100:3000
 ### Q8: 数据丢失了怎么办？
 
 如果有备份：
+
 1. 停止服务
 2. 用备份文件覆盖 `D:/data/baiwancheli/` 目录
 3. 重新启动服务
 
 如果没有备份：
+
 - 很遗憾，数据无法恢复
 - 建议立即建立定期备份机制
 
@@ -378,6 +406,7 @@ http://192.168.1.100:3000
 ### 联系方式
 
 如有技术问题，请提供：
+
 - 操作系统版本
 - Node.js版本
 - 错误信息截图
@@ -410,19 +439,19 @@ baiwancheli/
 
 系统提供以下API接口：
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/members` | GET | 获取会员列表 |
-| `/api/members` | POST | 创建会员 |
-| `/api/members/:phone` | PUT | 更新会员 |
-| `/api/tables` | GET | 获取桌台列表 |
-| `/api/tables` | POST | 保存桌台数据 |
-| `/api/recharge-records` | GET | 获取充值记录 |
-| `/api/recharge-records` | POST | 创建充值记录 |
-| `/api/consumption-records` | GET | 获取消费记录 |
+| 接口                       | 方法 | 说明         |
+| -------------------------- | ---- | ------------ |
+| `/api/members`             | GET  | 获取会员列表 |
+| `/api/members`             | POST | 创建会员     |
+| `/api/members/:phone`      | PUT  | 更新会员     |
+| `/api/tables`              | GET  | 获取桌台列表 |
+| `/api/tables`              | POST | 保存桌台数据 |
+| `/api/recharge-records`    | GET  | 获取充值记录 |
+| `/api/recharge-records`    | POST | 创建充值记录 |
+| `/api/consumption-records` | GET  | 获取消费记录 |
 | `/api/consumption-records` | POST | 创建消费记录 |
-| `/api/orders` | GET | 获取订单列表 |
-| `/api/orders` | POST | 创建订单 |
+| `/api/orders`              | GET  | 获取订单列表 |
+| `/api/orders`              | POST | 创建订单     |
 
 ### C. 性能优化建议
 

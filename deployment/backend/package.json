@@ -1,7 +1,7 @@
 {
   "name": "baiwancheli-backend",
   "version": "1.0.0",
-  "description": "百万车厘子管理系统 - 后端服务",
+  "description": "百万撤离管理系统 - 后端服务",
   "type": "module",
   "main": "server/index.js",
   "scripts": {

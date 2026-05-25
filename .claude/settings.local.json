@@ -11,7 +11,9 @@
       "Bash(node test-add-person.mjs)",
       "Bash(npm ls *)",
       "Bash(npm install *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(cp -r \"d:/code/my-vue3-ts-app/dist\" \"d:/code/my-vue3-ts-app/deployment/frontend/dist\")",
+      "Bash(cp -r \"d:/code/my-vue3-ts-app/dist\" \"d:/code/my-vue3-ts-app/deployment/backend/server/dist\")"
     ]
   }
 }

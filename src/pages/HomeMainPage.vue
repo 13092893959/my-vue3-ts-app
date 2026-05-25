@@ -1,6 +1,6 @@
 <template>
   <div class="home-main-placeholder">
-    <h2>欢迎来到百万撤离主题桌游</h2>
+    <h2>欢迎来到百万撤离主机桌游馆</h2>
     <p>这是首页展示区域，后续可以添加业务仪表盘、快捷入口和聚合数据。</p>
   </div>
 </template>
