@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(timeout 5 node server/index.js)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npx vue-tsc *)",
+      "Bash(npx vite *)"
     ]
   }
 }

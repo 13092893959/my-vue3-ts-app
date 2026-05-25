@@ -19,6 +19,7 @@
                 @share="shareCard"
                 @orders="viewOrders"
                 @settle="settleCard"
+                @settle-multi="settleCardMulti"
                 @booking="bookingTable"
                 @cancel-booking="cancelBooking"
                 @edit="editCard"
@@ -534,6 +535,164 @@ const settleCard = async (
       ElMessage.error(error instanceof Error ? error.message : "结算失败")
     }
   }
+}
+
+// 拆单结算：创建多笔订单
+interface SettleGroup {
+  id: string
+  label: string
+  users: number
+  memberId: number | null
+  selectedPackageIds: string[]
+  totalAmount: number
+  discount: number
+  finalAmount: number
+  paymentMethod: string
+  assignedSnackIndices: number[]
+}
+
+const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (!card || !card.startTimestamp) return
+
+  const endTime = Date.now()
+  const duration = Math.round((endTime - card.startTimestamp) / 1000)
+  const durationMinutes = Math.ceil(duration / 60)
+  const batchId = `BATCH-${Date.now()}`
+  const allTableSnacks = card.currentOrderSnacks || []
+
+  // 收集所有分组分配的零食（用于统一扣库存）
+  const allAssignedSnacks: any[] = []
+
+  for (const group of groups) {
+    // 查找该分组的会员信息
+    let memberInfo = null
+    if (group.memberId) {
+      try {
+        const membersResponse = await fetch("http://localhost:3000/api/members")
+        const membersResult = await membersResponse.json()
+        if (membersResult.success) {
+          memberInfo = membersResult.data.find(
+            (m: any) => m.id === group.memberId,
+          )
+        }
+      } catch (error) {
+        console.error("加载会员信息失败:", error)
+      }
+    }
+
+    // 查找该分组的套餐信息
+    let packageInfos: any[] = []
+    if (group.selectedPackageIds && group.selectedPackageIds.length > 0) {
+      try {
+        const packagesResponse = await fetch("http://localhost:3000/api/packages")
+        const packagesResult = await packagesResponse.json()
+        if (packagesResult.success) {
+          packageInfos = group.selectedPackageIds
+            .map((pid) => packagesResult.data.find((p: any) => p.id === pid))
+            .filter(Boolean)
+        }
+      } catch (error) {
+        console.error("加载套餐信息失败:", error)
+      }
+    }
+
+    // 该分组的零食
+    const groupSnacks = group.assignedSnackIndices
+      .map((idx) => allTableSnacks[idx])
+      .filter(Boolean)
+
+    const orderData: any = {
+      tableId: card.id,
+      tableCode: card.id,
+      entertainment: card.currentEntertainment || "",
+      users: group.users,
+      startTime: card.startTimestamp,
+      endTime: endTime,
+      duration: durationMinutes,
+      amount: group.finalAmount,
+      totalAmount: group.totalAmount,
+      discount: group.discount,
+      memberId: group.memberId || null,
+      memberPhone: memberInfo?.phone || null,
+      memberName: memberInfo?.name || null,
+      paymentMethod: group.paymentMethod || "cash",
+      cardType: memberInfo?.cardType || null,
+      packageIds: group.selectedPackageIds || [],
+      packageNames: packageInfos.map((p) => p.name).join(", "),
+      packageTotal: group.totalAmount,
+      remark: card.currentOrderRemark || "",
+      snacks: groupSnacks,
+      snackTotal: groupSnacks.reduce(
+        (sum: number, s: any) => sum + s.price * s.quantity,
+        0,
+      ),
+      // 拆单标识字段
+      groupLabel: group.label,
+      groupId: group.id,
+      settlementBatchId: batchId,
+      totalUsersAtTable: card.currentUsers,
+    }
+
+    try {
+      const orderResponse = await fetch("http://localhost:3000/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      })
+
+      if (!orderResponse.ok) {
+        throw new Error("网络响应错误")
+      }
+
+      const orderResult = await orderResponse.json()
+      if (!orderResult.success) {
+        throw new Error(orderResult.message || "创建订单失败")
+      }
+
+      // 处理该分组的会员支付
+      if (group.paymentMethod === "member_balance" && memberInfo) {
+        await processMemberPayment(
+          memberInfo,
+          group.finalAmount,
+          card.currentEntertainment || "",
+          durationMinutes,
+        )
+      }
+
+      // 收集零食用于统一扣库存
+      if (groupSnacks.length > 0) {
+        allAssignedSnacks.push(...groupSnacks)
+      }
+    } catch (error) {
+      console.error(`分组 ${group.label} 结算失败:`, error)
+      ElMessage.error(
+        error instanceof Error ? error.message : `分组 ${group.label} 结算失败`,
+      )
+    }
+  }
+
+  // 统一更新零食库存
+  if (allAssignedSnacks.length > 0) {
+    await updateSnackStock(allAssignedSnacks)
+  }
+
+  // 重置桌台状态
+  card.isInUse = false
+  card.isBooked = false
+  card.bookingInfo = null
+  card.status = "空闲"
+  card.currentUsers = 0
+  card.currentEntertainment = undefined
+  card.startTimestamp = null
+  card.initialMinutes = undefined
+  card.currentOrderRemark = ""
+  card.currentOrderSnacks = []
+  saveCards()
+
+  ElMessage.success(
+    `拆单结算完成，共创建 ${groups.length} 笔订单`,
+  )
 }
 
 // 更新零食库存

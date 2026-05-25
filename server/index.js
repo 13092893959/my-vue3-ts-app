@@ -347,6 +347,19 @@ app.post('/api/orders', (req, res) => {
   }
 })
 
+// 按批次ID查询订单
+app.get('/api/orders/batch/:batchId', (req, res) => {
+  try {
+    const { batchId } = req.params
+    const orders = readData('orders')
+    const batchOrders = orders.filter(order => order.settlementBatchId === batchId)
+    res.json({ success: true, data: batchOrders })
+  } catch (error) {
+    console.error('获取批次订单失败:', error)
+    res.status(500).json({ success: false, message: '获取批次订单失败' })
+  }
+})
+
 // 更新订单备注
 app.put('/api/orders/:orderId/remark', (req, res) => {
   try {

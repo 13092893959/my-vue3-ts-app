@@ -193,8 +193,8 @@
   <!-- 结算确认对话框 -->
   <el-dialog
     v-model="showSettleDialog"
-    title="结束计时 - 订单结算"
-    width="600px"
+    :title="useSplitBill ? '结束计时 - 拆单结算' : '结束计时 - 订单结算'"
+    :width="useSplitBill ? '850px' : '600px'"
     append-to-body
   >
     <div class="settle-info">
@@ -229,161 +229,313 @@
         <span class="settle-value">{{ calculateBillableHours() }}小时</span>
       </div>
 
-      <!-- 会员信息区域 -->
-      <el-divider>会员信息</el-divider>
-      <el-form :model="settleForm" label-width="100px" style="margin-top: 16px">
-        <el-form-item label="关联会员">
-          <el-select
-            v-model="settleForm.memberId"
-            placeholder="输入手机号或姓名搜索会员（可选）"
-            filterable
-            clearable
-            :filter-method="filterMembers"
-            style="width: 100%"
-            @change="handleMemberSelect"
-          >
-            <el-option
-              v-for="member in filteredMembers"
-              :key="member.id"
-              :label="`${member.name || '(无名)'} ${member.phone ? '(' + member.phone + ')' : ''}`"
-              :value="member.id"
+      <!-- 拆单开关 -->
+      <el-divider>结算方式</el-divider>
+      <div class="split-toggle-bar">
+        <span class="split-toggle-label">拆单结算</span>
+        <el-switch v-model="useSplitBill" @change="toggleSplitBill" />
+        <span v-if="useSplitBill" class="split-toggle-hint">
+          将一桌拆分为多个订单分别结算
+        </span>
+      </div>
+
+      <!-- ========== 单组结算模式（拆单关闭） ========== -->
+      <template v-if="!useSplitBill">
+        <el-divider>会员信息</el-divider>
+        <el-form :model="settleForm" label-width="100px" style="margin-top: 16px">
+          <el-form-item label="关联会员">
+            <el-select
+              v-model="settleForm.memberId"
+              placeholder="输入手机号或姓名搜索会员（可选）"
+              filterable
+              clearable
+              :filter-method="filterMembers"
+              style="width: 100%"
+              @change="handleMemberSelect"
             >
-              <div
-                style="
-                  display: flex;
-                  align-items: center;
-                  justify-content: space-between;
-                "
+              <el-option
+                v-for="member in filteredMembers"
+                :key="member.id"
+                :label="`${member.name || '(无名)'} ${member.phone ? '(' + member.phone + ')' : ''}`"
+                :value="member.id"
               >
-                <div style="display: flex; align-items: center; gap: 8px">
-                  <span>{{ member.name }}</span>
-                  <el-tag
-                    v-if="member.isMember === true"
-                    type="success"
-                    size="small"
-                  >
-                    ⭐ 会员
-                  </el-tag>
+                <div
+                  style="
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <span>{{ member.name }}</span>
+                    <el-tag
+                      v-if="member.isMember === true"
+                      type="success"
+                      size="small"
+                    >
+                      ⭐ 会员
+                    </el-tag>
+                  </div>
+                  <span style="color: #8492a6; font-size: 13px">
+                    {{
+                      member.cardType === "充值卡"
+                        ? `余额: ¥${(member.balance || 0).toFixed(2)}`
+                        : `剩余: ${member.remainingTimes}次`
+                    }}
+                  </span>
                 </div>
-                <span style="color: #8492a6; font-size: 13px">
-                  {{
-                    member.cardType === "充值卡"
-                      ? `余额: ¥${(member.balance || 0).toFixed(2)}`
-                      : `剩余: ${member.remainingTimes}次`
-                  }}
-                </span>
+              </el-option>
+            </el-select>
+          </el-form-item>
+
+          <el-alert
+            v-if="selectedMember"
+            :title="getMemberBalanceInfo()"
+            type="info"
+            :closable="false"
+            style="margin-bottom: 16px"
+          />
+
+          <el-alert
+            v-if="props.card.currentOrderRemark"
+            title="订单备注"
+            type="warning"
+            :closable="false"
+            style="margin-bottom: 16px"
+          >
+            <template #default>
+              <div style="white-space: pre-wrap; word-break: break-all">
+                {{ props.card.currentOrderRemark }}
               </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
+            </template>
+          </el-alert>
 
-        <!-- 显示会员余额/次数信息 -->
-        <el-alert
-          v-if="selectedMember"
-          :title="getMemberBalanceInfo()"
-          type="info"
-          :closable="false"
-          style="margin-bottom: 16px"
-        />
+          <el-form-item label="团购套餐">
+            <el-select
+              v-model="settleForm.selectedPackageIds"
+              multiple
+              placeholder="请选择团购套餐（可多选）"
+              style="width: 100%"
+              @change="calculateTotalAmount"
+            >
+              <el-option
+                v-for="pkg in availablePackages"
+                :key="pkg.id"
+                :label="`${pkg.name} - ¥${pkg.price}`"
+                :value="pkg.id"
+              >
+                <div
+                  style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    width: 100%;
+                  "
+                >
+                  <span style="flex: 1; text-align: left">{{ pkg.name }}</span>
+                  <el-tag
+                    size="small"
+                    :type="getEntertainmentTagType(pkg.entertainment)"
+                    style="margin-left: 8px; min-width: 60px; text-align: center"
+                  >
+                    {{ pkg.entertainment }}
+                  </el-tag>
+                  <span
+                    style="
+                      color: #f56c6c;
+                      font-weight: bold;
+                      margin-left: 8px;
+                      min-width: 60px;
+                      text-align: right;
+                    "
+                    >¥{{ pkg.price }}</span
+                  >
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item>
 
-        <!-- 显示当前订单备注 -->
-        <el-alert
-          v-if="props.card.currentOrderRemark"
-          title="订单备注"
-          type="warning"
-          :closable="false"
-          style="margin-bottom: 16px"
-        >
-          <template #default>
-            <div style="white-space: pre-wrap; word-break: break-all">
-              {{ props.card.currentOrderRemark }}
+          <el-form-item label="总金额">
+            <el-input-number
+              v-model="settleForm.totalAmount"
+              :min="0"
+              :precision="2"
+              :step="1"
+              controls-position="right"
+              style="width: 100%"
+              @change="calculateFinalAmount"
+            >
+              <template #prefix>¥</template>
+            </el-input-number>
+          </el-form-item>
+
+          <el-form-item label="折扣">
+            <el-input-number
+              v-model="settleForm.discount"
+              :min="0"
+              :max="100"
+              :precision="0"
+              :step="5"
+              controls-position="right"
+              style="width: 100%"
+              @change="calculateFinalAmount"
+            >
+              <template #append>%</template>
+            </el-input-number>
+          </el-form-item>
+          <el-form-item label="支付方式">
+            <el-radio-group v-model="settleForm.paymentMethod">
+              <el-radio label="member_balance" :disabled="!canUseMemberBalance">
+                余额支付
+              </el-radio>
+              <el-radio label="package">团购套餐</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-form>
+      </template>
+
+      <!-- ========== 拆单结算模式（拆单开启） ========== -->
+      <template v-else>
+        <el-divider>结算分组</el-divider>
+        <div class="split-groups-area">
+          <!-- 分组Tab切换栏 -->
+          <div class="group-tabs-bar">
+            <div class="group-tabs">
+              <el-button
+                v-for="group in settleGroups"
+                :key="group.id"
+                :type="activeGroupId === group.id ? 'primary' : ''"
+                size="small"
+                @click="activeGroupId = group.id"
+              >
+                {{ group.label }}
+              </el-button>
+            </div>
+            <el-button type="success" size="small" @click="addGroup" :icon="Plus">
+              添加分组
+            </el-button>
+            <el-button
+              v-if="settleGroups.length > 1"
+              type="danger"
+              size="small"
+              @click="removeGroup(activeGroupId)"
+              :disabled="settleGroups.length <= 1"
+            >
+              删除当前分组
+            </el-button>
+          </div>
+
+          <!-- 人数校验提示 -->
+          <el-alert
+            :title="`已分配人数：${totalAssignedUsers} / ${props.card.currentUsers} 人`"
+            :type="totalAssignedUsers === props.card.currentUsers ? 'success' : 'warning'"
+            :closable="false"
+            style="margin-bottom: 12px"
+          />
+
+          <!-- 当前分组的表单 -->
+          <template v-for="group in settleGroups" :key="group.id">
+            <div v-show="activeGroupId === group.id" class="group-form-panel">
+              <el-form label-width="100px">
+                <el-form-item label="分组人数">
+                  <el-input-number
+                    :model-value="group.users"
+                    :min="1"
+                    :max="props.card.currentUsers"
+                    controls-position="right"
+                    style="width: 100%"
+                    @change="(v) => updateGroupUsers(group.id, v)"
+                  />
+                </el-form-item>
+                <el-form-item label="关联会员">
+                  <el-select
+                    :model-value="group.memberId"
+                    placeholder="输入手机号或姓名搜索会员（可选）"
+                    filterable
+                    clearable
+                    :filter-method="filterMembers"
+                    style="width: 100%"
+                    @change="(v) => selectGroupMember(group.id, v)"
+                  >
+                    <el-option
+                      v-for="member in filteredMembers"
+                      :key="member.id"
+                      :label="`${member.name || '(无名)'} ${member.phone ? '(' + member.phone + ')' : ''}`"
+                      :value="member.id"
+                    >
+                      <div style="display: flex; align-items: center; justify-content: space-between">
+                        <div style="display: flex; align-items: center; gap: 8px">
+                          <span>{{ member.name }}</span>
+                          <el-tag v-if="member.isMember === true" type="success" size="small">⭐ 会员</el-tag>
+                        </div>
+                        <span style="color: #8492a6; font-size: 13px">
+                          {{ member.cardType === '充值卡' ? `余额: ¥${(member.balance || 0).toFixed(2)}` : `剩余: ${member.remainingTimes}次` }}
+                        </span>
+                      </div>
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="团购套餐">
+                  <el-select
+                    :model-value="group.selectedPackageIds"
+                    multiple
+                    placeholder="请选择团购套餐（可多选）"
+                    style="width: 100%"
+                    @change="(v) => updateGroupPackages(group.id, v)"
+                  >
+                    <el-option
+                      v-for="pkg in availablePackages"
+                      :key="pkg.id"
+                      :label="`${pkg.name} - ¥${pkg.price}`"
+                      :value="pkg.id"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="总金额">
+                  <el-input-number
+                    :model-value="group.totalAmount"
+                    :min="0"
+                    :precision="2"
+                    :step="1"
+                    controls-position="right"
+                    style="width: 100%"
+                    @change="(v) => updateGroupAmount(group.id, v)"
+                  >
+                    <template #prefix>¥</template>
+                  </el-input-number>
+                </el-form-item>
+                <el-form-item label="折扣">
+                  <el-input-number
+                    :model-value="group.discount"
+                    :min="0"
+                    :max="100"
+                    :precision="0"
+                    :step="5"
+                    controls-position="right"
+                    style="width: 100%"
+                    @change="(v) => updateGroupDiscount(group.id, v)"
+                  >
+                    <template #append>%</template>
+                  </el-input-number>
+                </el-form-item>
+                <el-form-item label="支付方式">
+                  <el-radio-group
+                    :model-value="group.paymentMethod"
+                    @change="(v) => updateGroupPayment(group.id, v)"
+                  >
+                    <el-radio label="member_balance">余额支付</el-radio>
+                    <el-radio label="package">团购套餐</el-radio>
+                    <el-radio label="cash">现金</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+                <el-form-item label="应付金额">
+                  <span class="group-final-amount">¥{{ group.finalAmount.toFixed(2) }}</span>
+                </el-form-item>
+              </el-form>
             </div>
           </template>
-        </el-alert>
-
-        <!-- 团购套餐选择（多选） -->
-        <el-form-item label="团购套餐">
-          <el-select
-            v-model="settleForm.selectedPackageIds"
-            multiple
-            placeholder="请选择团购套餐（可多选）"
-            style="width: 100%"
-            @change="calculateTotalAmount"
-          >
-            <el-option
-              v-for="pkg in availablePackages"
-              :key="pkg.id"
-              :label="`${pkg.name} - ¥${pkg.price}`"
-              :value="pkg.id"
-            >
-              <div
-                style="
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-                  width: 100%;
-                "
-              >
-                <span style="flex: 1; text-align: left">{{ pkg.name }}</span>
-                <el-tag
-                  size="small"
-                  :type="getEntertainmentTagType(pkg.entertainment)"
-                  style="margin-left: 8px; min-width: 60px; text-align: center"
-                >
-                  {{ pkg.entertainment }}
-                </el-tag>
-                <span
-                  style="
-                    color: #f56c6c;
-                    font-weight: bold;
-                    margin-left: 8px;
-                    min-width: 60px;
-                    text-align: right;
-                  "
-                  >¥{{ pkg.price }}</span
-                >
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="总金额">
-          <el-input-number
-            v-model="settleForm.totalAmount"
-            :min="0"
-            :precision="2"
-            :step="1"
-            controls-position="right"
-            style="width: 100%"
-            @change="calculateFinalAmount"
-          >
-            <template #prefix>¥</template>
-          </el-input-number>
-        </el-form-item>
-
-        <el-form-item label="折扣">
-          <el-input-number
-            v-model="settleForm.discount"
-            :min="0"
-            :max="100"
-            :precision="0"
-            :step="5"
-            controls-position="right"
-            style="width: 100%"
-            @change="calculateFinalAmount"
-          >
-            <template #append>%</template>
-          </el-input-number>
-        </el-form-item>
-        <el-form-item label="支付方式">
-          <el-radio-group v-model="settleForm.paymentMethod">
-            <el-radio label="member_balance" :disabled="!canUseMemberBalance">
-              余额支付
-            </el-radio>
-            <el-radio label="package">团购套餐</el-radio>
-          </el-radio-group>
-        </el-form-item>
-      </el-form>
+        </div>
+      </template>
 
       <!-- 零食信息区域 -->
       <div
@@ -399,7 +551,7 @@
           border
           style="width: 100%"
         >
-          <el-table-column prop="name" label="名称" min-width="120" />
+          <el-table-column prop="name" label="名称" min-width="50" />
           <el-table-column prop="price" label="单价" width="80" align="right">
             <template #default="{ row }">
               ¥{{ row.price.toFixed(2) }}
@@ -408,7 +560,7 @@
           <el-table-column
             prop="quantity"
             label="数量"
-            width="140"
+            width="200"
             align="center"
           >
             <template #default="{ row, $index }">
@@ -421,12 +573,30 @@
             </template>
           </el-table-column>
           <el-table-column prop="unit" label="单位" width="60" align="center" />
-          <el-table-column label="小计" width="100" align="right">
+          <el-table-column label="小计" width="80" align="right">
             <template #default="{ row }">
               ¥{{ (row.price * row.quantity).toFixed(2) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" min-width="100" align="center">
+          <!-- 拆单模式下显示所属分组列 -->
+          <el-table-column v-if="useSplitBill" label="所属分组" width="140" align="center">
+            <template #default="{ $index }">
+              <el-select
+                :model-value="snackGroupAssignment[$index]"
+                size="small"
+                style="width: 120px"
+                @change="(v) => assignSnackToGroup($index, v)"
+              >
+                <el-option
+                  v-for="group in settleGroups"
+                  :key="group.id"
+                  :label="group.label"
+                  :value="group.id"
+                />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" min-width="80" align="center">
             <template #default="{ $index }">
               <el-button
                 type="danger"
@@ -446,10 +616,42 @@
         </div>
       </div>
 
+      <!-- 拆单汇总 -->
+      <template v-if="useSplitBill && settleGroups.length > 1">
+        <el-divider>结算汇总</el-divider>
+        <el-table :data="settleGroups" size="small" border style="width: 100%">
+          <el-table-column prop="label" label="分组" width="130" />
+          <el-table-column prop="users" label="人数" width="60" align="center" />
+          <el-table-column label="会员" min-width="100">
+            <template #default="{ row }">
+              {{ row.memberId ? (getMemberNameById(row.memberId)) : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="金额" width="100" align="right">
+            <template #default="{ row }"> ¥{{ row.finalAmount.toFixed(2) }} </template>
+          </el-table-column>
+          <el-table-column label="支付方式" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.paymentMethod === 'member_balance'" type="success" size="small">余额</el-tag>
+              <el-tag v-else-if="row.paymentMethod === 'package'" type="warning" size="small">套餐</el-tag>
+              <el-tag v-else type="info" size="small">现金</el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="settle-grand-total">
+          <span>合计：</span>
+          <span class="total-price">¥{{ grandTotal.toFixed(2) }}</span>
+        </div>
+      </template>
+
       <div class="settle-item highlight final-price">
         <span class="settle-label">应付金额</span>
         <span class="settle-value price"
-          >¥{{ settleForm.finalAmount.toFixed(2) }}</span
+          >¥{{
+            useSplitBill
+              ? grandTotal.toFixed(2)
+              : settleForm.finalAmount.toFixed(2)
+          }}</span
         >
       </div>
     </div>
@@ -999,6 +1201,19 @@ type CardProps = {
   }
 }
 
+interface SettleGroup {
+  id: string
+  label: string
+  users: number
+  memberId: number | null
+  selectedPackageIds: string[]
+  totalAmount: number
+  discount: number
+  finalAmount: number
+  paymentMethod: string
+  assignedSnackIndices: number[]
+}
+
 const props = defineProps<CardProps>()
 const emit = defineEmits<{
   (
@@ -1026,6 +1241,7 @@ const emit = defineEmits<{
       snackTotal?: number
     },
   ): void
+  (e: "settle-multi", id: string, groups: SettleGroup[]): void
   (e: "booking", id: string, bookingData: any): void
   (e: "cancel-booking", id: string): void
   (e: "edit", id: string): void
@@ -1134,6 +1350,32 @@ const filterMembers = (query: string) => {
 
 // 可用套餐列表
 const availablePackages = ref<any[]>([])
+
+// 拆单结算相关状态
+const useSplitBill = ref(false)
+const settleGroups = ref<SettleGroup[]>([])
+const activeGroupId = ref("")
+
+const totalAssignedUsers = computed(() =>
+  settleGroups.value.reduce((sum, g) => sum + g.users, 0),
+)
+
+const snackGroupAssignment = ref<Record<number, string>>({}) // snackIndex -> groupId
+
+const createDefaultGroup = (): SettleGroup => ({
+  id: `group-${Date.now()}`,
+  label: `分组 1 (${props.card.currentUsers}人)`,
+  users: props.card.currentUsers,
+  memberId: null,
+  selectedPackageIds: [],
+  totalAmount: 0,
+  discount: 100,
+  finalAmount: 0,
+  paymentMethod: "member_balance",
+  assignedSnackIndices: props.card.currentOrderSnacks
+    ? props.card.currentOrderSnacks.map((_: any, i: number) => i)
+    : [],
+})
 
 // 根据娱乐类型返回标签颜色类型
 const getEntertainmentTagType = (
@@ -1601,6 +1843,17 @@ const openSettleDialog = async () => {
   settleForm.value.paymentMethod = "member_balance"
   settleForm.value.selectedPackageIds = []
   selectedMember.value = null
+  // 重置拆单状态
+  useSplitBill.value = false
+  settleGroups.value = [createDefaultGroup()]
+  activeGroupId.value = settleGroups.value[0].id
+  snackGroupAssignment.value = {}
+  // 默认所有零食归第一组
+  if (currentOrder.value?.snacks) {
+    currentOrder.value.snacks.forEach((_: any, i: number) => {
+      snackGroupAssignment.value[i] = settleGroups.value[0].id
+    })
+  }
   // 加载会员列表和套餐列表
   await Promise.all([loadMembers(), loadPackages()])
   // 打开对话框
@@ -1645,6 +1898,11 @@ const handleMemberSelect = (id: number) => {
   calculateFinalAmount()
 }
 
+const getMemberNameById = (id: number) => {
+  const m = availableMembers.value.find((member: any) => member.id === id)
+  return m?.name || "-"
+}
+
 // 获取会员余额信息
 const getMemberBalanceInfo = () => {
   if (!selectedMember.value) return ""
@@ -1669,18 +1927,174 @@ const canUseMemberBalance = computed(() => {
   return false
 })
 
-const confirmSettle = () => {
-  // 触发父组件进行结算，传递结算信息和零食数据
-  emit("settle", props.card.id, {
-    totalAmount: settleForm.value.totalAmount,
-    discount: settleForm.value.discount,
-    finalAmount: settleForm.value.finalAmount,
-    memberId: settleForm.value.memberId,
-    paymentMethod: settleForm.value.paymentMethod,
-    selectedPackageIds: settleForm.value.selectedPackageIds,
-    snacks: currentOrder.value?.snacks || [],
-    snackTotal: calculateSnackTotal(),
+// 拆单分组管理函数
+const addGroup = () => {
+  const idx = settleGroups.value.length + 1
+  const remainingUsers =
+    props.card.currentUsers - totalAssignedUsers.value
+  const defaultUsers = Math.max(1, remainingUsers > 0 ? remainingUsers : 1)
+  const newGroup: SettleGroup = {
+    id: `group-${Date.now()}-${idx}`,
+    label: `分组 ${idx} (${defaultUsers}人)`,
+    users: defaultUsers,
+    memberId: null,
+    selectedPackageIds: [],
+    totalAmount: 0,
+    discount: 100,
+    finalAmount: 0,
+    paymentMethod: "member_balance",
+    assignedSnackIndices: [],
+  }
+  settleGroups.value.push(newGroup)
+  activeGroupId.value = newGroup.id
+}
+
+const removeGroup = (groupId: string) => {
+  if (settleGroups.value.length <= 1) return
+  settleGroups.value = settleGroups.value.filter((g) => g.id !== groupId)
+  if (activeGroupId.value === groupId) {
+    activeGroupId.value = settleGroups.value[0]?.id || ""
+  }
+}
+
+const updateGroupUsers = (groupId: string, count: number) => {
+  const group = settleGroups.value.find((g) => g.id === groupId)
+  if (group) {
+    group.users = count
+    const idx = settleGroups.value.indexOf(group) + 1
+    group.label = `分组 ${idx} (${count}人)`
+  }
+}
+
+const updateGroupLabel = () => {
+  settleGroups.value.forEach((g, i) => {
+    g.label = `分组 ${i + 1} (${g.users}人)`
   })
+}
+
+const selectGroupMember = (groupId: string, memberId: number | null) => {
+  const group = settleGroups.value.find((g) => g.id === groupId)
+  if (!group) return
+  group.memberId = memberId
+  const member = memberId
+    ? availableMembers.value.find((m: any) => m.id === memberId) || null
+    : null
+  if (member && member.isMember === true) {
+    group.discount = 88
+  } else {
+    group.discount = 100
+  }
+  calcGroupFinal(group)
+}
+
+const updateGroupPackages = (groupId: string, packageIds: string[]) => {
+  const group = settleGroups.value.find((g) => g.id === groupId)
+  if (!group) return
+  group.selectedPackageIds = packageIds
+  let total = 0
+  packageIds.forEach((pid) => {
+    const pkg = availablePackages.value.find((p: any) => p.id === pid)
+    if (pkg) total += pkg.price
+  })
+  group.totalAmount = total
+  calcGroupFinal(group)
+}
+
+const toggleSplitBill = (val: boolean) => {
+  if (val) {
+    // 开启拆单时初始化分组
+    if (settleGroups.value.length === 0) {
+      settleGroups.value = [createDefaultGroup()]
+      activeGroupId.value = settleGroups.value[0].id
+    }
+    // 初始化零食分配（默认归第一组）
+    if (currentOrder.value?.snacks) {
+      const firstGroupId = settleGroups.value[0].id
+      currentOrder.value.snacks.forEach((_: any, i: number) => {
+        if (!(i in snackGroupAssignment.value)) {
+          snackGroupAssignment.value = {
+            ...snackGroupAssignment.value,
+            [i]: firstGroupId,
+          }
+        }
+      })
+    }
+  }
+}
+
+const calcGroupFinal = (group: SettleGroup) => {
+  const discountRate = group.discount / 100
+  const snackTotal = group.assignedSnackIndices.reduce((sum, idx) => {
+    const snack = currentOrder.value?.snacks?.[idx]
+    return sum + (snack ? snack.price * snack.quantity : 0)
+  }, 0)
+  group.finalAmount = group.totalAmount * discountRate + snackTotal
+}
+
+const updateGroupDiscount = (groupId: string, discount: number) => {
+  const group = settleGroups.value.find((g) => g.id === groupId)
+  if (group) {
+    group.discount = discount
+    calcGroupFinal(group)
+  }
+}
+
+const updateGroupAmount = (groupId: string, amount: number) => {
+  const group = settleGroups.value.find((g) => g.id === groupId)
+  if (group) {
+    group.totalAmount = amount
+    calcGroupFinal(group)
+  }
+}
+
+const updateGroupPayment = (groupId: string, method: string) => {
+  const group = settleGroups.value.find((g) => g.id === groupId)
+  if (group) {
+    group.paymentMethod = method
+  }
+}
+
+const assignSnackToGroup = (snackIndex: number, groupId: string) => {
+  snackGroupAssignment.value = {
+    ...snackGroupAssignment.value,
+    [snackIndex]: groupId,
+  }
+  // Recalc all groups since snack assignment changed
+  settleGroups.value.forEach((g) => {
+    g.assignedSnackIndices = Object.entries(snackGroupAssignment.value)
+      .filter(([, gid]) => gid === g.id)
+      .map(([idx]) => parseInt(idx))
+    calcGroupFinal(g)
+  })
+}
+
+const grandTotal = computed(() =>
+  settleGroups.value.reduce((sum, g) => sum + g.finalAmount, 0),
+)
+
+const confirmSettle = () => {
+  if (useSplitBill.value) {
+    // 验证人数总和
+    if (totalAssignedUsers.value !== props.card.currentUsers) {
+      ElMessage.warning(
+        `分组人数总和（${totalAssignedUsers.value}人）与桌台人数（${props.card.currentUsers}人）不一致，请调整`,
+      )
+      return
+    }
+    emit("settle-multi", props.card.id, settleGroups.value)
+  } else {
+    // 单组结算，保持向后兼容
+    emit("settle", props.card.id, {
+      totalAmount: settleForm.value.totalAmount,
+      discount: settleForm.value.discount,
+      finalAmount: settleForm.value.finalAmount,
+      memberId: settleForm.value.memberId,
+      paymentMethod: settleForm.value.paymentMethod,
+      selectedPackageIds: settleForm.value.selectedPackageIds,
+      snacks: currentOrder.value?.snacks || [],
+      snackTotal: calculateSnackTotal(),
+    })
+  }
   showSettleDialog.value = false
 }
 
@@ -2213,5 +2627,68 @@ onUnmounted(() => {
 
 .no-snack {
   color: #c0c4cc;
+}
+
+/* 拆单结算样式 */
+.split-toggle-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.split-toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.split-toggle-hint {
+  font-size: 12px;
+  color: #909399;
+}
+
+.split-groups-area {
+  margin-top: 8px;
+}
+
+.group-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.group-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.group-form-panel {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.group-final-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f56c6c;
+}
+
+.settle-grand-total {
+  margin-top: 12px;
+  text-align: right;
+  font-size: 14px;
+  padding: 12px 16px;
+  background: #fef0f0;
+  border-radius: 4px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
 }
 </style>

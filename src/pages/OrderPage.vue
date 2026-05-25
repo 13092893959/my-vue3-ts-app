@@ -96,6 +96,18 @@
         <el-table-column prop="tableId" label="桌台编号" min-width="120" />
         <el-table-column prop="entertainment" label="娱乐类型" min-width="150" />
         <el-table-column prop="users" label="人数" width="80" align="center" />
+        <el-table-column label="批次/分组" min-width="140" align="center">
+          <template #default="{ row }">
+            <template v-if="row.settlementBatchId">
+              <el-tag type="warning" size="small" style="margin-bottom: 2px">
+                {{ row.settlementBatchId }}
+              </el-tag>
+              <br />
+              <span class="group-label-text">{{ row.groupLabel }}</span>
+            </template>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="会员信息" min-width="150">
           <template #default="{ row }">
             <span v-if="row.memberName" class="member-info">
@@ -217,6 +229,17 @@
           </el-descriptions>
         </div>
 
+        <!-- 拆单信息 -->
+        <div v-if="currentOrder.settlementBatchId" class="detail-section">
+          <h3 class="section-title">拆单信息</h3>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="结算批次">{{ currentOrder.settlementBatchId }}</el-descriptions-item>
+            <el-descriptions-item label="分组">{{ currentOrder.groupLabel || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="桌台总人数">{{ currentOrder.totalUsersAtTable || '-' }}人</el-descriptions-item>
+            <el-descriptions-item label="本组人数">{{ currentOrder.users }}人</el-descriptions-item>
+          </el-descriptions>
+        </div>
+
         <!-- 会员信息 -->
         <div v-if="currentOrder.memberName" class="detail-section">
           <h3 class="section-title">会员信息</h3>
@@ -265,13 +288,13 @@
             </el-tag>
           </h3>
           <el-table :data="currentOrder.snacks" stripe border size="small" style="width: 100%">
-            <el-table-column prop="name" label="名称" min-width="150" />
+            <el-table-column prop="name" label="名称" min-width="50" />
             <el-table-column prop="price" label="单价" width="120" align="right">
               <template #default="{ row }">
                 ¥{{ row.price.toFixed(2) }}/{{ row.unit }}
               </template>
             </el-table-column>
-            <el-table-column prop="quantity" label="数量" width="100" align="center" />
+            <el-table-column prop="quantity" label="数量" width="200" align="center" />
             <el-table-column prop="unit" label="单位" width="80" align="center" />
             <el-table-column label="小计" min-width="120" align="right">
               <template #default="{ row }">
@@ -333,6 +356,11 @@ interface Order {
   pricePerHour?: number
   discount?: number
   remark?: string
+  // 拆单字段
+  groupLabel?: string
+  groupId?: string
+  settlementBatchId?: string
+  totalUsersAtTable?: number
 }
 
 interface SearchForm {
@@ -765,6 +793,11 @@ onMounted(() => {
 }
 
 .no-snack {
+  color: var(--app-text-muted);
+}
+
+.group-label-text {
+  font-size: 11px;
   color: var(--app-text-muted);
 }
 </style>
