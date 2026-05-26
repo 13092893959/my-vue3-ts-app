@@ -70,7 +70,9 @@
           class="timer-session-row"
         >
           <span class="session-label">{{ session.label }}</span>
-          <span class="session-time">{{ formatTime(getSessionElapsed(session)) }}</span>
+          <span class="session-time">{{
+            formatTime(getSessionElapsed(session))
+          }}</span>
         </div>
       </div>
       <!-- 向后兼容：无 timerSessions 时显示单计时器 -->
@@ -146,16 +148,28 @@
       <!-- 使用中模式：操作按钮 2x2 网格 -->
       <div v-else class="action-row-in-use">
         <div class="action-grid">
-          <el-button type="success" size="default" @click.stop="openAddPersonDialog">
-            加人
+          <el-button
+            type="success"
+            size="default"
+            @click.stop="openAddPersonDialog"
+          >
+            拼桌
           </el-button>
           <el-button type="info" size="default" @click.stop="viewOrders">
             订单
           </el-button>
-          <el-button type="warning" size="default" @click.stop="openMidSettleDialog">
+          <el-button
+            type="warning"
+            size="default"
+            @click.stop="openMidSettleDialog"
+          >
             中途结算
           </el-button>
-          <el-button type="danger" size="default" @click.stop="openSettleDialog">
+          <el-button
+            type="danger"
+            size="default"
+            @click.stop="openSettleDialog"
+          >
             结束计时
           </el-button>
         </div>
@@ -211,16 +225,16 @@
     </template>
   </el-dialog>
 
-  <!-- 加人对话框 -->
+  <!-- 拼桌对话框 -->
   <el-dialog
     v-model="showAddPersonDialog"
-    title="中途加人"
+    title="拼桌"
     width="500px"
     append-to-body
     @close="resetAddPersonForm"
   >
     <el-form :model="addPersonForm" label-width="100px">
-      <el-form-item label="加人人数">
+      <el-form-item label="拼桌人数">
         <el-input-number
           v-model="addPersonForm.users"
           :min="1"
@@ -241,7 +255,7 @@
     </el-form>
     <template #footer>
       <el-button @click="showAddPersonDialog = false">取消</el-button>
-      <el-button type="primary" @click="confirmAddPerson">确认加人</el-button>
+      <el-button type="primary" @click="confirmAddPerson">确认拼桌</el-button>
     </template>
   </el-dialog>
 
@@ -265,7 +279,11 @@
     </div>
 
     <el-divider>离场信息</el-divider>
-    <el-form :model="midSettleForm" label-width="100px" style="margin-top: 16px">
+    <el-form
+      :model="midSettleForm"
+      label-width="100px"
+      style="margin-top: 16px"
+    >
       <el-form-item label="退出批次">
         <el-select
           v-model="midSettleForm.sessionId"
@@ -308,13 +326,28 @@
             :label="`${member.name || '(无名)'} ${member.phone ? '(' + member.phone + ')' : ''}`"
             :value="member.id"
           >
-            <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+              "
+            >
               <div style="display: flex; align-items: center; gap: 8px">
                 <span>{{ member.name }}</span>
-                <el-tag v-if="member.isMember === true" type="success" size="small">⭐ 会员</el-tag>
+                <el-tag
+                  v-if="member.isMember === true"
+                  type="success"
+                  size="small"
+                  >⭐ 会员</el-tag
+                >
               </div>
               <span style="color: #8492a6; font-size: 13px">
-                {{ member.cardType === '充值卡' ? `余额: ¥${(member.balance || 0).toFixed(2)}` : `剩余: ${member.remainingTimes}次` }}
+                {{
+                  member.cardType === "充值卡"
+                    ? `余额: ¥${(member.balance || 0).toFixed(2)}`
+                    : `剩余: ${member.remainingTimes}次`
+                }}
               </span>
             </div>
           </el-option>
@@ -322,10 +355,13 @@
       </el-form-item>
 
       <el-form-item label="计算方式">
-        <div style="display: flex; align-items: center;">
-          <el-switch v-model="midSettleUsePerPerson" @change="onMidSettlePerPersonToggle" />
-          <span style="margin-left: 8px; font-size: 12px; color: #909399;">
-            {{ midSettleUsePerPerson ? '按人均计算' : '按总金额计算' }}
+        <div style="display: flex; align-items: center">
+          <el-switch
+            v-model="midSettleUsePerPerson"
+            @change="onMidSettlePerPersonToggle"
+          />
+          <span style="margin-left: 8px; font-size: 12px; color: #909399">
+            {{ midSettleUsePerPerson ? "按人均计算" : "按总金额计算" }}
           </span>
         </div>
       </el-form-item>
@@ -345,7 +381,6 @@
           />
         </el-select>
       </el-form-item>
-
 
       <el-form-item v-if="midSettleUsePerPerson" label="每人金额">
         <el-input-number
@@ -374,8 +409,12 @@
         >
           <template #prefix>¥</template>
         </el-input-number>
-        <span v-if="midSettleUsePerPerson" style="font-size: 11px; color: #909399;">
-          = ¥{{ midSettlePerPersonAmount || 0 }} x {{ midSettleForm.leavingUsers }}人
+        <span
+          v-if="midSettleUsePerPerson"
+          style="font-size: 11px; color: #909399"
+        >
+          = ¥{{ midSettlePerPersonAmount || 0 }} x
+          {{ midSettleForm.leavingUsers }}人
         </span>
       </el-form-item>
 
@@ -396,7 +435,9 @@
 
       <el-form-item label="支付方式">
         <el-radio-group v-model="midSettleForm.paymentMethod">
-          <el-radio label="member_balance" :disabled="!midSettleSelectedMember">余额支付</el-radio>
+          <el-radio label="member_balance" :disabled="!midSettleSelectedMember"
+            >余额支付</el-radio
+          >
           <el-radio label="package">团购套餐</el-radio>
           <el-radio label="cash">现金</el-radio>
         </el-radio-group>
@@ -406,13 +447,20 @@
     <!-- 零食分配 -->
     <template v-if="getSnacks().length > 0">
       <el-divider>零食分配</el-divider>
-      <el-table :data="getSnacks()" border size="small" style="margin-top: 12px">
+      <el-table
+        :data="getSnacks()"
+        border
+        size="small"
+        style="margin-top: 12px"
+      >
         <el-table-column prop="name" label="名称" width="120" />
         <el-table-column prop="price" label="单价" width="80">
           <template #default="{ row: r }">¥{{ r.price }}</template>
         </el-table-column>
         <el-table-column label="桌台数量" width="100">
-          <template #default="{ row: r }">{{ r.quantity }}{{ r.unit }}</template>
+          <template #default="{ row: r }"
+            >{{ r.quantity }}{{ r.unit }}</template
+          >
         </el-table-column>
         <el-table-column label="带走数量" min-width="120">
           <template #default="{ row: r, $index: i }">
@@ -423,7 +471,15 @@
               size="small"
               controls-position="right"
               style="width: 100%"
-              @change="(v) => { midSettleSnackAssignment = { ...midSettleSnackAssignment, [i]: v || 0 }; midSettleCalcFinal(); }"
+              @change="
+                (v) => {
+                  midSettleSnackAssignment = {
+                    ...midSettleSnackAssignment,
+                    [i]: v || 0,
+                  }
+                  midSettleCalcFinal()
+                }
+              "
             />
           </template>
         </el-table-column>
@@ -435,8 +491,17 @@
       </el-table>
     </template>
 
-    <div style="text-align: right; margin-top: 16px; font-size: 16px; font-weight: bold;">
-      应付金额：<span style="color: #f56c6c;">¥{{ midSettleForm.finalAmount.toFixed(2) }}</span>
+    <div
+      style="
+        text-align: right;
+        margin-top: 16px;
+        font-size: 16px;
+        font-weight: bold;
+      "
+    >
+      应付金额：<span style="color: #f56c6c"
+        >¥{{ midSettleForm.finalAmount.toFixed(2) }}</span
+      >
     </div>
 
     <template #footer>
@@ -497,7 +562,11 @@
       <!-- ========== 单组结算模式（拆单关闭） ========== -->
       <template v-if="!useSplitBill">
         <el-divider>会员信息</el-divider>
-        <el-form :model="settleForm" label-width="100px" style="margin-top: 16px">
+        <el-form
+          :model="settleForm"
+          label-width="100px"
+          style="margin-top: 16px"
+        >
           <el-form-item label="关联会员">
             <el-select
               v-model="settleForm.memberId"
@@ -566,10 +635,13 @@
           </el-alert>
 
           <el-form-item label="计算方式">
-            <div style="display: flex; align-items: center;">
-              <el-switch v-model="usePerPersonCalc" @change="onPerPersonToggle" />
-              <span style="margin-left: 8px; font-size: 12px; color: #909399;">
-                {{ usePerPersonCalc ? '按人均计算' : '按总金额计算' }}
+            <div style="display: flex; align-items: center">
+              <el-switch
+                v-model="usePerPersonCalc"
+                @change="onPerPersonToggle"
+              />
+              <span style="margin-left: 8px; font-size: 12px; color: #909399">
+                {{ usePerPersonCalc ? "按人均计算" : "按总金额计算" }}
               </span>
             </div>
           </el-form-item>
@@ -599,7 +671,11 @@
                   <el-tag
                     size="small"
                     :type="getEntertainmentTagType(pkg.entertainment)"
-                    style="margin-left: 8px; min-width: 60px; text-align: center"
+                    style="
+                      margin-left: 8px;
+                      min-width: 60px;
+                      text-align: center;
+                    "
                   >
                     {{ pkg.entertainment }}
                   </el-tag>
@@ -617,7 +693,6 @@
               </el-option>
             </el-select>
           </el-form-item>
-
 
           <el-form-item v-if="usePerPersonCalc" label="每人金额">
             <el-input-number
@@ -646,7 +721,10 @@
             >
               <template #prefix>¥</template>
             </el-input-number>
-            <span v-if="usePerPersonCalc" style="font-size: 11px; color: #909399;">
+            <span
+              v-if="usePerPersonCalc"
+              style="font-size: 11px; color: #909399"
+            >
               = ¥{{ perPersonAmount || 0 }} x {{ card.currentUsers }}人
             </span>
           </el-form-item>
@@ -693,7 +771,12 @@
                 {{ group.label }}
               </el-button>
             </div>
-            <el-button type="success" size="small" @click="addGroup" :icon="Plus">
+            <el-button
+              type="success"
+              size="small"
+              @click="addGroup"
+              :icon="Plus"
+            >
               添加分组
             </el-button>
             <el-button
@@ -710,7 +793,11 @@
           <!-- 人数校验提示 -->
           <el-alert
             :title="`已分配人数：${totalAssignedUsers} / ${props.card.currentUsers} 人`"
-            :type="totalAssignedUsers === props.card.currentUsers ? 'success' : 'warning'"
+            :type="
+              totalAssignedUsers === props.card.currentUsers
+                ? 'success'
+                : 'warning'
+            "
             :closable="false"
             style="margin-bottom: 12px"
           />
@@ -745,26 +832,49 @@
                       :label="`${member.name || '(无名)'} ${member.phone ? '(' + member.phone + ')' : ''}`"
                       :value="member.id"
                     >
-                      <div style="display: flex; align-items: center; justify-content: space-between">
-                        <div style="display: flex; align-items: center; gap: 8px">
+                      <div
+                        style="
+                          display: flex;
+                          align-items: center;
+                          justify-content: space-between;
+                        "
+                      >
+                        <div
+                          style="display: flex; align-items: center; gap: 8px"
+                        >
                           <span>{{ member.name }}</span>
-                          <el-tag v-if="member.isMember === true" type="success" size="small">⭐ 会员</el-tag>
+                          <el-tag
+                            v-if="member.isMember === true"
+                            type="success"
+                            size="small"
+                            >⭐ 会员</el-tag
+                          >
                         </div>
                         <span style="color: #8492a6; font-size: 13px">
-                          {{ member.cardType === '充值卡' ? `余额: ¥${(member.balance || 0).toFixed(2)}` : `剩余: ${member.remainingTimes}次` }}
+                          {{
+                            member.cardType === "充值卡"
+                              ? `余额: ¥${(member.balance || 0).toFixed(2)}`
+                              : `剩余: ${member.remainingTimes}次`
+                          }}
                         </span>
                       </div>
                     </el-option>
                   </el-select>
                 </el-form-item>
                 <el-form-item label="计算方式">
-                  <div style="display: flex; align-items: center;">
+                  <div style="display: flex; align-items: center">
                     <el-switch
                       :model-value="groupUsePerPerson[group.id] || false"
                       @change="(v) => onGroupPerPersonToggle(group.id, v)"
                     />
-                    <span style="margin-left: 8px; font-size: 12px; color: #909399;">
-                      {{ groupUsePerPerson[group.id] ? '按人均计算' : '按总金额计算' }}
+                    <span
+                      style="margin-left: 8px; font-size: 12px; color: #909399"
+                    >
+                      {{
+                        groupUsePerPerson[group.id]
+                          ? "按人均计算"
+                          : "按总金额计算"
+                      }}
                     </span>
                   </div>
                 </el-form-item>
@@ -785,7 +895,10 @@
                   </el-select>
                 </el-form-item>
 
-                <el-form-item v-if="groupUsePerPerson[group.id]" label="每人金额">
+                <el-form-item
+                  v-if="groupUsePerPerson[group.id]"
+                  label="每人金额"
+                >
                   <el-input-number
                     :model-value="groupPerPersonAmounts[group.id] || 0"
                     :min="0"
@@ -812,8 +925,12 @@
                   >
                     <template #prefix>¥</template>
                   </el-input-number>
-                  <span v-if="groupUsePerPerson[group.id]" style="font-size: 11px; color: #909399;">
-                    = ¥{{ groupPerPersonAmounts[group.id] || 0 }} x {{ group.users }}人
+                  <span
+                    v-if="groupUsePerPerson[group.id]"
+                    style="font-size: 11px; color: #909399"
+                  >
+                    = ¥{{ groupPerPersonAmounts[group.id] || 0 }} x
+                    {{ group.users }}人
                   </span>
                 </el-form-item>
                 <el-form-item label="折扣">
@@ -835,13 +952,17 @@
                     :model-value="group.paymentMethod"
                     @change="(v) => updateGroupPayment(group.id, v)"
                   >
-                    <el-radio label="member_balance" :disabled="!group.memberId">余额支付</el-radio>
+                    <el-radio label="member_balance" :disabled="!group.memberId"
+                      >余额支付</el-radio
+                    >
                     <el-radio label="package">团购套餐</el-radio>
                     <el-radio label="cash">现金</el-radio>
                   </el-radio-group>
                 </el-form-item>
                 <el-form-item label="应付金额">
-                  <span class="group-final-amount">¥{{ group.finalAmount.toFixed(2) }}</span>
+                  <span class="group-final-amount"
+                    >¥{{ group.finalAmount.toFixed(2) }}</span
+                  >
                 </el-form-item>
               </el-form>
             </div>
@@ -850,17 +971,9 @@
       </template>
 
       <!-- 零食信息区域 -->
-      <div
-        v-if="getSnacks().length > 0"
-        class="snack-settle-section"
-      >
+      <div v-if="getSnacks().length > 0" class="snack-settle-section">
         <el-divider>零食明细</el-divider>
-        <el-table
-          :data="getSnacks()"
-          size="small"
-          border
-          style="width: 100%"
-        >
+        <el-table :data="getSnacks()" size="small" border style="width: 100%">
           <el-table-column prop="name" label="名称" min-width="50" />
           <el-table-column prop="price" label="单价" width="80" align="right">
             <template #default="{ row }">
@@ -890,7 +1003,12 @@
             </template>
           </el-table-column>
           <!-- 拆单模式下显示分组数量分配列 -->
-          <el-table-column v-if="useSplitBill" label="分组分配" :min-width="settleGroups.length * 80 + 20" align="center">
+          <el-table-column
+            v-if="useSplitBill"
+            label="分组分配"
+            :min-width="settleGroups.length * 80 + 20"
+            align="center"
+          >
             <template #default="{ row, $index }">
               <div class="snack-group-quantities">
                 <span
@@ -898,15 +1016,23 @@
                   :key="group.id"
                   class="snack-qty-item"
                 >
-                  <span class="snack-qty-label">{{ group.label.split('(')[0] }}</span>
+                  <span class="snack-qty-label">{{
+                    group.label.split("(")[0]
+                  }}</span>
                   <el-input-number
-                    :model-value="(snackGroupAssignment[$index] && snackGroupAssignment[$index][group.id]) || 0"
+                    :model-value="
+                      (snackGroupAssignment[$index] &&
+                        snackGroupAssignment[$index][group.id]) ||
+                      0
+                    "
                     :min="0"
                     :max="row.quantity"
                     size="small"
                     controls-position="right"
                     style="width: 60px"
-                    @change="(v) => assignSnackToGroup($index, group.id, v || 0)"
+                    @change="
+                      (v) => assignSnackToGroup($index, group.id, v || 0)
+                    "
                   />
                 </span>
               </div>
@@ -937,19 +1063,36 @@
         <el-divider>结算汇总</el-divider>
         <el-table :data="settleGroups" size="small" border style="width: 100%">
           <el-table-column prop="label" label="分组" width="130" />
-          <el-table-column prop="users" label="人数" width="60" align="center" />
+          <el-table-column
+            prop="users"
+            label="人数"
+            width="60"
+            align="center"
+          />
           <el-table-column label="会员" min-width="100">
             <template #default="{ row }">
-              {{ row.memberId ? (getMemberNameById(row.memberId)) : '-' }}
+              {{ row.memberId ? getMemberNameById(row.memberId) : "-" }}
             </template>
           </el-table-column>
           <el-table-column label="金额" width="100" align="right">
-            <template #default="{ row }"> ¥{{ row.finalAmount.toFixed(2) }} </template>
+            <template #default="{ row }">
+              ¥{{ row.finalAmount.toFixed(2) }}
+            </template>
           </el-table-column>
           <el-table-column label="支付方式" width="100" align="center">
             <template #default="{ row }">
-              <el-tag v-if="row.paymentMethod === 'member_balance'" type="success" size="small">余额</el-tag>
-              <el-tag v-else-if="row.paymentMethod === 'package'" type="warning" size="small">套餐</el-tag>
+              <el-tag
+                v-if="row.paymentMethod === 'member_balance'"
+                type="success"
+                size="small"
+                >余额</el-tag
+              >
+              <el-tag
+                v-else-if="row.paymentMethod === 'package'"
+                type="warning"
+                size="small"
+                >套餐</el-tag
+              >
               <el-tag v-else type="info" size="small">现金</el-tag>
             </template>
           </el-table-column>
@@ -1533,7 +1676,7 @@ interface SettleGroup {
   discount: number
   finalAmount: number
   paymentMethod: string
-  assignedSnacks: Record<number, number>  // snackIndex → allocated quantity
+  assignedSnacks: Record<number, number> // snackIndex → allocated quantity
 }
 
 const props = defineProps<CardProps>()
@@ -1564,18 +1707,26 @@ const emit = defineEmits<{
     },
   ): void
   (e: "settle-multi", id: string, groups: SettleGroup[]): void
-  (e: "add-person", id: string, data: { users: number; startTimestamp: number }): void
-  (e: "mid-settle", id: string, data: {
-    sessionId: string
-    leavingUsers: number
-    memberId: number | null
-    selectedPackageIds: string[]
-    totalAmount: number
-    discount: number
-    finalAmount: number
-    paymentMethod: string
-    assignedSnacks: Record<number, number>
-  }): void
+  (
+    e: "add-person",
+    id: string,
+    data: { users: number; startTimestamp: number },
+  ): void
+  (
+    e: "mid-settle",
+    id: string,
+    data: {
+      sessionId: string
+      leavingUsers: number
+      memberId: number | null
+      selectedPackageIds: string[]
+      totalAmount: number
+      discount: number
+      finalAmount: number
+      paymentMethod: string
+      assignedSnacks: Record<number, number>
+    },
+  ): void
   (e: "booking", id: string, bookingData: any): void
   (e: "cancel-booking", id: string): void
   (e: "edit", id: string): void
@@ -1637,9 +1788,9 @@ const showDetailDialog = ref(false)
 const showBookingDialog = ref(false)
 const showSettleDialog = ref(false) // 结算确认对话框
 const showOrdersDialog = ref(false) // 订单详情对话框
-const showAddPersonDialog = ref(false) // 加人对话框
+const showAddPersonDialog = ref(false) // 拼桌对话框
 
-// 加人表单
+// 拼桌表单
 const addPersonForm = ref({
   users: 1,
   startTime: null as string | null,
@@ -1697,11 +1848,12 @@ const filteredMembers = computed(() => {
   if (!memberSearchKeyword.value) {
     return availableMembers.value
   }
-  
+
   const keyword = memberSearchKeyword.value.toLowerCase()
-  return availableMembers.value.filter(member => 
-    member.name.toLowerCase().includes(keyword) || 
-    member.phone.includes(keyword)
+  return availableMembers.value.filter(
+    (member) =>
+      member.name.toLowerCase().includes(keyword) ||
+      member.phone.includes(keyword),
   )
 })
 
@@ -1733,9 +1885,9 @@ const groupPerPersonAmounts = ref<Record<string, number>>({})
 
 // 获取当前零食数据（优先 local ref，fallback 到 prop）
 const getSnacks = () => {
-  return (currentOrder.value?.snacks && currentOrder.value.snacks.length > 0)
+  return currentOrder.value?.snacks && currentOrder.value.snacks.length > 0
     ? currentOrder.value.snacks
-    : (props.card.currentOrderSnacks || [])
+    : props.card.currentOrderSnacks || []
 }
 
 const getSnackByIndex = (idx: number) => {
@@ -1881,7 +2033,7 @@ const shareTable = () => {
   emit("share", props.card.id)
 }
 
-// 加人相关函数
+// 拼桌相关函数
 const openAddPersonDialog = () => {
   addPersonForm.value = { users: 1, startTime: null as string | null }
   showAddPersonDialog.value = true
@@ -1893,11 +2045,10 @@ const resetAddPersonForm = () => {
 
 const confirmAddPerson = () => {
   if (addPersonForm.value.users <= 0) {
-    ElMessage.warning("请输入加人人数")
+    ElMessage.warning("请输入拼桌人数")
     return
   }
-  const remaining =
-    props.card.capacity - (props.card.currentUsers || 0)
+  const remaining = props.card.capacity - (props.card.currentUsers || 0)
   if (addPersonForm.value.users > remaining) {
     ElMessage.warning(`桌台最多还能加 ${remaining} 人`)
     return
@@ -1922,7 +2073,9 @@ const confirmAddPerson = () => {
 
 // ---- 中途结算 ----
 const midSettleMaxLeaving = computed(() => {
-  const session = props.card.timerSessions?.find((s) => s.id === midSettleForm.value.sessionId)
+  const session = props.card.timerSessions?.find(
+    (s) => s.id === midSettleForm.value.sessionId,
+  )
   return session ? session.users : 1
 })
 
@@ -1953,7 +2106,9 @@ const onMidSettleSessionChange = () => {
 }
 
 const midSettleHandleMemberSelect = (id: number | null) => {
-  midSettleSelectedMember.value = id ? (availableMembers.value.find((m) => m.id === id) || null) : null
+  midSettleSelectedMember.value = id
+    ? availableMembers.value.find((m) => m.id === id) || null
+    : null
   if (midSettleSelectedMember.value?.isMember === true) {
     midSettleForm.value.discount = 88
   } else {
@@ -1979,7 +2134,9 @@ const midSettleCalcPackages = () => {
   if (midSettleUsePerPerson.value) {
     const manual = midSettlePerPersonAmount.value
     const totalPerPerson = packagePerPerson + manual
-    midSettleForm.value.totalAmount = parseFloat((totalPerPerson * midSettleForm.value.leavingUsers).toFixed(2))
+    midSettleForm.value.totalAmount = parseFloat(
+      (totalPerPerson * midSettleForm.value.leavingUsers).toFixed(2),
+    )
     if (manual === 0 && packagePerPerson > 0) {
       midSettlePerPersonAmount.value = parseFloat(packagePerPerson.toFixed(2))
     }
@@ -1996,15 +2153,22 @@ const midSettleCalcPackages = () => {
 
 const onMidSettlePerPersonToggle = (val: boolean) => {
   if (val) {
-    midSettlePerPersonAmount.value = midSettleForm.value.leavingUsers > 0
-      ? parseFloat((midSettleForm.value.totalAmount / midSettleForm.value.leavingUsers).toFixed(2))
-      : 0
+    midSettlePerPersonAmount.value =
+      midSettleForm.value.leavingUsers > 0
+        ? parseFloat(
+            (
+              midSettleForm.value.totalAmount / midSettleForm.value.leavingUsers
+            ).toFixed(2),
+          )
+        : 0
     onMidSettlePerPersonAmountChange(midSettlePerPersonAmount.value)
   }
 }
 
 const onMidSettlePerPersonAmountChange = (val: number) => {
-  midSettleForm.value.totalAmount = parseFloat((val * midSettleForm.value.leavingUsers).toFixed(2))
+  midSettleForm.value.totalAmount = parseFloat(
+    (val * midSettleForm.value.leavingUsers).toFixed(2),
+  )
   midSettleCalcFinal()
 }
 
@@ -2015,7 +2179,8 @@ const midSettleCalcFinal = () => {
     const snack = getSnackByIndex(parseInt(idxStr))
     if (snack) snackTotal += snack.price * qty
   })
-  midSettleForm.value.finalAmount = midSettleForm.value.totalAmount * discountRate + snackTotal
+  midSettleForm.value.finalAmount =
+    midSettleForm.value.totalAmount * discountRate + snackTotal
 }
 
 const confirmMidSettle = () => {
@@ -2023,7 +2188,9 @@ const confirmMidSettle = () => {
     ElMessage.warning("请选择退出的批次")
     return
   }
-  const session = props.card.timerSessions?.find((s) => s.id === midSettleForm.value.sessionId)
+  const session = props.card.timerSessions?.find(
+    (s) => s.id === midSettleForm.value.sessionId,
+  )
   if (!session) {
     ElMessage.warning("未找到对应批次")
     return
@@ -2389,7 +2556,9 @@ const calculateTotalAmount = () => {
   const manual = usePerPersonCalc.value ? perPersonAmount.value : 0
   const totalPerPerson = packagePerPerson + manual
   if (usePerPersonCalc.value) {
-    settleForm.value.totalAmount = parseFloat((totalPerPerson * props.card.currentUsers).toFixed(2))
+    settleForm.value.totalAmount = parseFloat(
+      (totalPerPerson * props.card.currentUsers).toFixed(2),
+    )
     // 当仅选了套餐没有手动输入时，同步显示套餐人均价格
     if (manual === 0 && packagePerPerson > 0) {
       perPersonAmount.value = parseFloat(packagePerPerson.toFixed(2))
@@ -2512,8 +2681,7 @@ const loadMembers = async () => {
 
 // 会员选择变化
 const handleMemberSelect = (id: number) => {
-  selectedMember.value =
-    availableMembers.value.find((m) => m.id === id) || null
+  selectedMember.value = availableMembers.value.find((m) => m.id === id) || null
 
   // 如果选择了会员且有余额/次数，默认使用会员支付
   if (selectedMember.value && canUseMemberBalance.value) {
@@ -2567,8 +2735,7 @@ const canUseMemberBalance = computed(() => {
 // 拆单分组管理函数
 const addGroup = () => {
   const idx = settleGroups.value.length + 1
-  const remainingUsers =
-    props.card.currentUsers - totalAssignedUsers.value
+  const remainingUsers = props.card.currentUsers - totalAssignedUsers.value
   const defaultUsers = Math.max(1, remainingUsers > 0 ? remainingUsers : 1)
   const newGroup: SettleGroup = {
     id: `group-${Date.now()}-${idx}`,
@@ -2725,16 +2892,21 @@ const updateGroupPayment = (groupId: string, method: string) => {
 // ---- 按人均计算 ----
 const onPerPersonToggle = (val: boolean) => {
   if (val) {
-    perPersonAmount.value = props.card.currentUsers > 0
-      ? parseFloat((settleForm.value.totalAmount / props.card.currentUsers).toFixed(2))
-      : 0
+    perPersonAmount.value =
+      props.card.currentUsers > 0
+        ? parseFloat(
+            (settleForm.value.totalAmount / props.card.currentUsers).toFixed(2),
+          )
+        : 0
     onPerPersonAmountChange(perPersonAmount.value)
   }
 }
 
 const onPerPersonAmountChange = (val: number) => {
   // perPersonAmount 是总人均价格，直接乘人数得总金额
-  settleForm.value.totalAmount = parseFloat((val * props.card.currentUsers).toFixed(2))
+  settleForm.value.totalAmount = parseFloat(
+    (val * props.card.currentUsers).toFixed(2),
+  )
   calculateFinalAmount()
 }
 
@@ -2744,9 +2916,10 @@ const onGroupPerPersonToggle = (groupId: string, val: boolean) => {
   if (val && group) {
     groupPerPersonAmounts.value = {
       ...groupPerPersonAmounts.value,
-      [groupId]: group.users > 0
-        ? parseFloat((group.totalAmount / group.users).toFixed(2))
-        : 0,
+      [groupId]:
+        group.users > 0
+          ? parseFloat((group.totalAmount / group.users).toFixed(2))
+          : 0,
     }
     onGroupPerPersonAmountChange(groupId, groupPerPersonAmounts.value[groupId])
   }
@@ -2755,13 +2928,20 @@ const onGroupPerPersonToggle = (groupId: string, val: boolean) => {
 const onGroupPerPersonAmountChange = (groupId: string, val: number) => {
   const group = settleGroups.value.find((g) => g.id === groupId)
   if (!group) return
-  groupPerPersonAmounts.value = { ...groupPerPersonAmounts.value, [groupId]: val }
+  groupPerPersonAmounts.value = {
+    ...groupPerPersonAmounts.value,
+    [groupId]: val,
+  }
   // perPersonAmount 是总人均价格，直接乘人数
   group.totalAmount = parseFloat((val * group.users).toFixed(2))
   calcGroupFinal(group)
 }
 
-const assignSnackToGroup = (snackIndex: number, groupId: string, quantity: number) => {
+const assignSnackToGroup = (
+  snackIndex: number,
+  groupId: string,
+  quantity: number,
+) => {
   const current = { ...(snackGroupAssignment.value[snackIndex] || {}) }
   if (quantity <= 0) {
     delete current[groupId]

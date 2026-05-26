@@ -400,12 +400,14 @@ const startCardTimer = (
     card.currentUsers = data.currentUsers
     card.startTimestamp = data.startTimestamp
     // 创建第一个 timer session
-    card.timerSessions = [{
-      id: `session-${Date.now()}`,
-      users: data.currentUsers,
-      startTimestamp: data.startTimestamp,
-      label: `批次 1 (${data.currentUsers}人)`,
-    }]
+    card.timerSessions = [
+      {
+        id: `session-${Date.now()}`,
+        users: data.currentUsers,
+        startTimestamp: data.startTimestamp,
+        label: `批次 1 (${data.currentUsers}人)`,
+      },
+    ]
     ElMessage.success(
       `卡片 ${id} 开始计时，娱乐类型：${data.entertainment}，人数：${data.currentUsers}`,
     )
@@ -428,12 +430,12 @@ const addPersonToCard = (
     })
     card.timerSessions = sessions
     card.currentUsers += data.users
-    // 如果加人时间早于最早计时，更新 startTimestamp
+    // 如果拼桌时间早于最早计时，更新 startTimestamp
     if (data.startTimestamp < card.startTimestamp!) {
       card.startTimestamp = data.startTimestamp
     }
     ElMessage.success(
-      `桌台 ${id} 加人 ${data.users} 人，当前共 ${card.currentUsers} 人`,
+      `桌台 ${id} 拼桌 ${data.users} 人，当前共 ${card.currentUsers} 人`,
     )
   }
 }
@@ -471,9 +473,12 @@ const settleCardMidway = async (
       const res = await fetch("http://localhost:3000/api/members")
       const result = await res.json()
       if (result.success) {
-        memberInfo = result.data.find((m: any) => m.id === data.memberId) || null
+        memberInfo =
+          result.data.find((m: any) => m.id === data.memberId) || null
       }
-    } catch (e) { console.error("加载会员信息失败:", e) }
+    } catch (e) {
+      console.error("加载会员信息失败:", e)
+    }
   }
 
   // Load package info
@@ -487,7 +492,9 @@ const settleCardMidway = async (
           .map((pid: string) => result.data.find((p: any) => p.id === pid))
           .filter(Boolean)
       }
-    } catch (e) { console.error("加载套餐信息失败:", e) }
+    } catch (e) {
+      console.error("加载套餐信息失败:", e)
+    }
   }
 
   // Build allocated snacks
@@ -500,7 +507,10 @@ const settleCardMidway = async (
       leavingSnacks.push({ ...snack, quantity: qty })
     }
   })
-  const snackTotal = leavingSnacks.reduce((sum: number, s: any) => sum + s.price * s.quantity, 0)
+  const snackTotal = leavingSnacks.reduce(
+    (sum: number, s: any) => sum + s.price * s.quantity,
+    0,
+  )
 
   const orderData: any = {
     tableId: card.id,
@@ -537,11 +547,17 @@ const settleCardMidway = async (
     })
     if (!orderRes.ok) throw new Error("网络响应错误")
     const orderResult = await orderRes.json()
-    if (!orderResult.success) throw new Error(orderResult.message || "创建订单失败")
+    if (!orderResult.success)
+      throw new Error(orderResult.message || "创建订单失败")
 
     // Process member payment
     if (data.paymentMethod === "member_balance" && memberInfo) {
-      await processMemberPayment(memberInfo, data.finalAmount, card.currentEntertainment || "", durationMinutes)
+      await processMemberPayment(
+        memberInfo,
+        data.finalAmount,
+        card.currentEntertainment || "",
+        durationMinutes,
+      )
     }
 
     // Update snack stock for leaving snacks
@@ -579,7 +595,11 @@ const settleCardMidway = async (
     }
 
     // If all sessions empty, full settle
-    if (!card.timerSessions || card.timerSessions.length === 0 || card.currentUsers <= 0) {
+    if (
+      !card.timerSessions ||
+      card.timerSessions.length === 0 ||
+      card.currentUsers <= 0
+    ) {
       card.isInUse = false
       card.isBooked = false
       card.bookingInfo = null
@@ -638,14 +658,19 @@ const settleCard = async (
 
     // 查找套餐信息
     let packageInfos: any[] = []
-    if (settleData.selectedPackageIds && settleData.selectedPackageIds.length > 0) {
+    if (
+      settleData.selectedPackageIds &&
+      settleData.selectedPackageIds.length > 0
+    ) {
       try {
-        const packagesResponse = await fetch("http://localhost:3000/api/packages")
+        const packagesResponse = await fetch(
+          "http://localhost:3000/api/packages",
+        )
         const packagesResult = await packagesResponse.json()
         if (packagesResult.success) {
-          packageInfos = settleData.selectedPackageIds.map(id => 
-            packagesResult.data.find((p: any) => p.id === id)
-          ).filter(Boolean)
+          packageInfos = settleData.selectedPackageIds
+            .map((id) => packagesResult.data.find((p: any) => p.id === id))
+            .filter(Boolean)
         }
       } catch (error) {
         console.error("加载套餐信息失败:", error)
@@ -672,7 +697,7 @@ const settleCard = async (
       cardType: memberInfo?.cardType || null,
       // 新增套餐关联信息（支持多选）
       packageIds: settleData.selectedPackageIds || [],
-      packageNames: packageInfos.map(p => p.name).join(", "),
+      packageNames: packageInfos.map((p) => p.name).join(", "),
       packageTotal: settleData.totalAmount,
       // 添加订单备注（从桌台数据中获取）
       remark: card.currentOrderRemark || "",
@@ -749,7 +774,7 @@ interface SettleGroup {
   discount: number
   finalAmount: number
   paymentMethod: string
-  assignedSnacks: Record<number, number>  // snackIndex → allocated quantity
+  assignedSnacks: Record<number, number> // snackIndex → allocated quantity
 }
 
 const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
@@ -768,7 +793,9 @@ const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
     const group = groups[gi]
     // 按分组索引匹配 timer session，获取该批次的开始时间
     const session = sessions[gi]
-    const groupStartTime = session ? session.startTimestamp : card.startTimestamp!
+    const groupStartTime = session
+      ? session.startTimestamp
+      : card.startTimestamp!
     const groupDuration = Math.round((endTime - groupStartTime) / 1000)
     const groupDurationMinutes = Math.ceil(groupDuration / 60)
     // 查找该分组的会员信息
@@ -791,7 +818,9 @@ const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
     let packageInfos: any[] = []
     if (group.selectedPackageIds && group.selectedPackageIds.length > 0) {
       try {
-        const packagesResponse = await fetch("http://localhost:3000/api/packages")
+        const packagesResponse = await fetch(
+          "http://localhost:3000/api/packages",
+        )
         const packagesResult = await packagesResponse.json()
         if (packagesResult.success) {
           packageInfos = group.selectedPackageIds
@@ -901,9 +930,7 @@ const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
   card.currentOrderSnacks = []
   saveCards()
 
-  ElMessage.success(
-    `拆单结算完成，共创建 ${groups.length} 笔订单`,
-  )
+  ElMessage.success(`拆单结算完成，共创建 ${groups.length} 笔订单`)
 }
 
 // 更新零食库存
@@ -914,29 +941,31 @@ const updateSnackStock = async (snacks: any[]) => {
     if (!response.ok) {
       throw new Error("获取零食列表失败")
     }
-    
+
     const result = await response.json()
     if (!result.success) {
       throw new Error(result.message || "获取零食列表失败")
     }
-    
+
     const allSnacks = result.data
-    
+
     // 更新每个零食的库存
     for (const snack of snacks) {
       const snackIndex = allSnacks.findIndex((s: any) => s.id === snack.snackId)
       if (snackIndex !== -1) {
         const currentStock = allSnacks[snackIndex].stock || 0
         const quantity = snack.quantity || 0
-        
+
         if (currentStock < quantity) {
-          console.warn(`零食 ${snack.name} 库存不足：当前${currentStock}，需要${quantity}`)
+          console.warn(
+            `零食 ${snack.name} 库存不足：当前${currentStock}，需要${quantity}`,
+          )
           continue
         }
-        
+
         // 减少库存
         allSnacks[snackIndex].stock = currentStock - quantity
-        
+
         // 保存更新后的零食数据
         const updateResponse = await fetch(
           `http://localhost:3000/api/snacks/${snack.snackId}`,
@@ -944,15 +973,15 @@ const updateSnackStock = async (snacks: any[]) => {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(allSnacks[snackIndex]),
-          }
+          },
         )
-        
+
         if (!updateResponse.ok) {
           console.error(`更新零食 ${snack.name} 库存失败`)
         }
       }
     }
-    
+
     console.log(`已更新 ${snacks.length} 种零食的库存`)
   } catch (error) {
     console.error("更新零食库存失败:", error)
