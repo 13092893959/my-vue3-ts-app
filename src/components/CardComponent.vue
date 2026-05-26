@@ -396,7 +396,7 @@
 
       <el-form-item label="支付方式">
         <el-radio-group v-model="midSettleForm.paymentMethod">
-          <el-radio label="member_balance">余额支付</el-radio>
+          <el-radio label="member_balance" :disabled="!midSettleSelectedMember">余额支付</el-radio>
           <el-radio label="package">团购套餐</el-radio>
           <el-radio label="cash">现金</el-radio>
         </el-radio-group>
@@ -835,7 +835,7 @@
                     :model-value="group.paymentMethod"
                     @change="(v) => updateGroupPayment(group.id, v)"
                   >
-                    <el-radio label="member_balance">余额支付</el-radio>
+                    <el-radio label="member_balance" :disabled="!group.memberId">余额支付</el-radio>
                     <el-radio label="package">团购套餐</el-radio>
                     <el-radio label="cash">现金</el-radio>
                   </el-radio-group>
@@ -851,14 +851,12 @@
 
       <!-- 零食信息区域 -->
       <div
-        v-if="
-          currentOrder && currentOrder.snacks && currentOrder.snacks.length > 0
-        "
+        v-if="getSnacks().length > 0"
         class="snack-settle-section"
       >
         <el-divider>零食明细</el-divider>
         <el-table
-          :data="currentOrder.snacks"
+          :data="getSnacks()"
           size="small"
           border
           style="width: 100%"
@@ -1657,7 +1655,7 @@ const midSettleForm = ref({
   totalAmount: 0,
   discount: 100,
   finalAmount: 0,
-  paymentMethod: "member_balance",
+  paymentMethod: "package",
 })
 const midSettleSelectedMember = ref<any>(null)
 const midSettleSnackAssignment = ref<Record<number, number>>({})
@@ -1683,7 +1681,7 @@ const settleForm = ref({
   discount: 100, // 默认100%（无折扣）
   finalAmount: 0, // 最终金额（应用折扣后）
   memberId: null as number | null, // 会员ID
-  paymentMethod: "member_balance", // 支付方式：member_balance/package
+  paymentMethod: "package", // 支付方式：member_balance/package
   selectedPackageIds: [] as string[], // 选中的套餐ID列表（多选）
 })
 
@@ -1759,7 +1757,7 @@ const createDefaultGroup = (): SettleGroup => {
     totalAmount: 0,
     discount: 100,
     finalAmount: 0,
-    paymentMethod: "member_balance",
+    paymentMethod: "package",
     assignedSnacks: assigned,
   }
 }
@@ -1938,7 +1936,7 @@ const openMidSettleDialog = async () => {
     totalAmount: 0,
     discount: 100,
     finalAmount: 0,
-    paymentMethod: "member_balance",
+    paymentMethod: "package",
   }
   midSettleSelectedMember.value = null
   midSettleSnackAssignment.value = {}
@@ -1960,6 +1958,12 @@ const midSettleHandleMemberSelect = (id: number | null) => {
     midSettleForm.value.discount = 88
   } else {
     midSettleForm.value.discount = 100
+  }
+  // 关联会员后自动切换支付方式
+  if (midSettleSelectedMember.value) {
+    midSettleForm.value.paymentMethod = "member_balance"
+  } else {
+    midSettleForm.value.paymentMethod = "package"
   }
   midSettleCalcFinal()
 }
@@ -2172,14 +2176,24 @@ const addSnackToOrder = (snack: any) => {
 // 移除零食
 const removeSnackFromOrder = (index: number) => {
   selectedSnacks.value.splice(index, 1)
+  // 同步到 currentOrder
+  if (currentOrder.value?.snacks) {
+    currentOrder.value.snacks.splice(index, 1)
+  }
 }
 
 // 更新零食数量
 const updateSnackQuantity = (index: number, quantity: number) => {
   if (quantity <= 0) {
     selectedSnacks.value.splice(index, 1)
+    if (currentOrder.value?.snacks) {
+      currentOrder.value.snacks.splice(index, 1)
+    }
   } else {
     selectedSnacks.value[index].quantity = quantity
+    if (currentOrder.value?.snacks) {
+      currentOrder.value.snacks[index].quantity = quantity
+    }
   }
 }
 
@@ -2407,7 +2421,7 @@ const openSettleDialog = async () => {
   settleForm.value.totalAmount = 0
   settleForm.value.discount = 100
   settleForm.value.memberId = null
-  settleForm.value.paymentMethod = "member_balance"
+  settleForm.value.paymentMethod = "package"
   settleForm.value.selectedPackageIds = []
   selectedMember.value = null
 
@@ -2435,7 +2449,7 @@ const openSettleDialog = async () => {
         totalAmount: 0,
         discount: 100,
         finalAmount: 0,
-        paymentMethod: "member_balance" as string,
+        paymentMethod: "package" as string,
         assignedSnacks: {} as Record<number, number>,
       }))
       // 如果有多个批次，自动开启拆单
@@ -2460,6 +2474,25 @@ const openSettleDialog = async () => {
 
   // 加载会员列表和套餐列表
   await Promise.all([loadMembers(), loadPackages()])
+
+  // 初始化 currentOrder（确保零食数据可用，无需先点订单）
+  if (!currentOrder.value && props.card.isInUse && props.card.startTimestamp) {
+    currentOrder.value = {
+      id: "CURRENT",
+      entertainment: props.card.currentEntertainment || "-",
+      users: props.card.currentUsers,
+      status: "in_progress",
+      startTime: props.card.startTimestamp,
+      endTime: null,
+      duration: Math.ceil(elapsedTime.value / 60),
+      amount: null,
+      createTime: new Date(props.card.startTimestamp).toISOString(),
+      remark: props.card.currentOrderRemark || "",
+      snacks: props.card.currentOrderSnacks || [],
+    }
+    selectedSnacks.value = [...(props.card.currentOrderSnacks || [])]
+  }
+
   // 打开对话框
   showSettleDialog.value = true
 }
@@ -2486,7 +2519,7 @@ const handleMemberSelect = (id: number) => {
   if (selectedMember.value && canUseMemberBalance.value) {
     settleForm.value.paymentMethod = "member_balance"
   } else {
-    settleForm.value.paymentMethod = "cash"
+    settleForm.value.paymentMethod = "package"
   }
 
   // 如果是会员（isMember为true），自动设置88折优惠
@@ -2546,7 +2579,7 @@ const addGroup = () => {
     totalAmount: 0,
     discount: 100,
     finalAmount: 0,
-    paymentMethod: "member_balance",
+    paymentMethod: "package",
     assignedSnacks: {},
   }
   settleGroups.value.push(newGroup)
@@ -2587,6 +2620,12 @@ const selectGroupMember = (groupId: string, memberId: number | null) => {
     group.discount = 88
   } else {
     group.discount = 100
+  }
+  // 关联会员后自动切换支付方式
+  if (member) {
+    group.paymentMethod = "member_balance"
+  } else {
+    group.paymentMethod = "package"
   }
   calcGroupFinal(group)
 }
