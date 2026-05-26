@@ -17,6 +17,7 @@
                 :card="card"
                 @start="startCardTimer"
                 @add-person="addPersonToCard"
+                @mid-settle="settleCardMidway"
                 @share="shareCard"
                 @orders="viewOrders"
                 @settle="settleCard"
@@ -434,6 +435,169 @@ const addPersonToCard = (
     ElMessage.success(
       `桌台 ${id} 加人 ${data.users} 人，当前共 ${card.currentUsers} 人`,
     )
+  }
+}
+
+const settleCardMidway = async (
+  id: string,
+  data: {
+    sessionId: string
+    leavingUsers: number
+    memberId: number | null
+    selectedPackageIds: string[]
+    totalAmount: number
+    discount: number
+    finalAmount: number
+    paymentMethod: string
+    assignedSnacks: Record<number, number>
+  },
+) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (!card || !card.startTimestamp) return
+
+  const sessions: any[] = card.timerSessions || []
+  const sessionIdx = sessions.findIndex((s: any) => s.id === data.sessionId)
+  if (sessionIdx === -1) return
+  const session = sessions[sessionIdx]
+
+  const endTime = Date.now()
+  const durationSeconds = Math.round((endTime - session.startTimestamp) / 1000)
+  const durationMinutes = Math.ceil(durationSeconds / 60)
+
+  // Load member info
+  let memberInfo: any = null
+  if (data.memberId) {
+    try {
+      const res = await fetch("http://localhost:3000/api/members")
+      const result = await res.json()
+      if (result.success) {
+        memberInfo = result.data.find((m: any) => m.id === data.memberId) || null
+      }
+    } catch (e) { console.error("加载会员信息失败:", e) }
+  }
+
+  // Load package info
+  let packageInfos: any[] = []
+  if (data.selectedPackageIds?.length > 0) {
+    try {
+      const res = await fetch("http://localhost:3000/api/packages")
+      const result = await res.json()
+      if (result.success) {
+        packageInfos = data.selectedPackageIds
+          .map((pid: string) => result.data.find((p: any) => p.id === pid))
+          .filter(Boolean)
+      }
+    } catch (e) { console.error("加载套餐信息失败:", e) }
+  }
+
+  // Build allocated snacks
+  const allTableSnacks: any[] = card.currentOrderSnacks || []
+  const leavingSnacks: any[] = []
+  Object.entries(data.assignedSnacks).forEach(([idxStr, qty]) => {
+    const idx = parseInt(idxStr)
+    const snack = allTableSnacks[idx]
+    if (snack && qty > 0) {
+      leavingSnacks.push({ ...snack, quantity: qty })
+    }
+  })
+  const snackTotal = leavingSnacks.reduce((sum: number, s: any) => sum + s.price * s.quantity, 0)
+
+  const orderData: any = {
+    tableId: card.id,
+    tableCode: card.id,
+    entertainment: card.currentEntertainment || "",
+    users: data.leavingUsers,
+    startTime: session.startTimestamp,
+    endTime,
+    duration: durationMinutes,
+    amount: data.finalAmount,
+    totalAmount: data.totalAmount,
+    discount: data.discount,
+    memberId: data.memberId || null,
+    memberPhone: memberInfo?.phone || null,
+    memberName: memberInfo?.name || null,
+    paymentMethod: data.paymentMethod || "cash",
+    cardType: memberInfo?.cardType || null,
+    packageIds: data.selectedPackageIds || [],
+    packageNames: packageInfos.map((p: any) => p.name).join(", "),
+    packageTotal: data.totalAmount,
+    remark: card.currentOrderRemark || "",
+    snacks: leavingSnacks,
+    snackTotal,
+    isMidwaySettlement: true,
+    parentSessionId: session.id,
+    parentSessionLabel: session.label,
+  }
+
+  try {
+    const orderRes = await fetch("http://localhost:3000/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderData),
+    })
+    if (!orderRes.ok) throw new Error("网络响应错误")
+    const orderResult = await orderRes.json()
+    if (!orderResult.success) throw new Error(orderResult.message || "创建订单失败")
+
+    // Process member payment
+    if (data.paymentMethod === "member_balance" && memberInfo) {
+      await processMemberPayment(memberInfo, data.finalAmount, card.currentEntertainment || "", durationMinutes)
+    }
+
+    // Update snack stock for leaving snacks
+    if (leavingSnacks.length > 0) {
+      await updateSnackStock(leavingSnacks)
+    }
+
+    // Deduct snacks from table
+    Object.entries(data.assignedSnacks).forEach(([idxStr, qty]) => {
+      const idx = parseInt(idxStr)
+      if (allTableSnacks[idx]) {
+        allTableSnacks[idx].quantity -= qty
+      }
+    })
+    // Remove zero-quantity snacks (reverse order to avoid index shift)
+    for (let i = allTableSnacks.length - 1; i >= 0; i--) {
+      if (allTableSnacks[i].quantity <= 0) {
+        allTableSnacks.splice(i, 1)
+      }
+    }
+    card.currentOrderSnacks = allTableSnacks
+
+    // Reduce session user count
+    session.users -= data.leavingUsers
+    card.currentUsers -= data.leavingUsers
+
+    if (session.users <= 0) {
+      card.timerSessions = sessions.filter((s: any) => s.id !== session.id)
+    } else {
+      // Re-label remaining sessions
+      const remainingSessions = card.timerSessions || []
+      remainingSessions.forEach((s: any, i: number) => {
+        s.label = `批次 ${i + 1} (${s.users}人)`
+      })
+    }
+
+    // If all sessions empty, full settle
+    if (!card.timerSessions || card.timerSessions.length === 0 || card.currentUsers <= 0) {
+      card.isInUse = false
+      card.isBooked = false
+      card.bookingInfo = null
+      card.status = "空闲"
+      card.currentUsers = 0
+      card.currentEntertainment = undefined
+      card.startTimestamp = null
+      card.initialMinutes = undefined
+      card.currentOrderRemark = ""
+      card.currentOrderSnacks = []
+      card.timerSessions = []
+    }
+
+    saveCards()
+    ElMessage.success(`中途结算完成，${data.leavingUsers}人已离场`)
+  } catch (error) {
+    console.error("中途结算失败:", error)
+    ElMessage.error(error instanceof Error ? error.message : "中途结算失败")
   }
 }
 

@@ -13,7 +13,10 @@
       "Bash(npm install *)",
       "Bash(npm uninstall *)",
       "Bash(cp -r \"d:/code/my-vue3-ts-app/dist\" \"d:/code/my-vue3-ts-app/deployment/frontend/dist\")",
-      "Bash(cp -r \"d:/code/my-vue3-ts-app/dist\" \"d:/code/my-vue3-ts-app/deployment/backend/server/dist\")"
+      "Bash(cp -r \"d:/code/my-vue3-ts-app/dist\" \"d:/code/my-vue3-ts-app/deployment/backend/server/dist\")",
+      "Bash(node \"d:\\\\code\\\\my-vue3-ts-app-2\\\\server\\\\init-data.js\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)",
+      "Bash(node test-settle.mjs)"
     ]
   }
 }
