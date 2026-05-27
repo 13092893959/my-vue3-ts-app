@@ -151,7 +151,7 @@
           <el-button
             type="success"
             size="default"
-            @click.stop="openAddPersonDialog"
+            @click.stop="showAddPersonDialog = true"
           >
             拼桌
           </el-button>
@@ -178,86 +178,19 @@
   </el-card>
 
   <!-- 开始计时对话框 -->
-  <el-dialog
-    v-model="showTimerDialog"
-    title="开始计时"
-    width="500px"
-    append-to-body
-    @close="resetTimerForm"
-  >
-    <el-form :model="timerForm" label-width="100px">
-      <el-form-item label="娱乐类型">
-        <el-select
-          v-model="timerForm.entertainment"
-          placeholder="请选择娱乐类型"
-          style="width: 100%"
-        >
-          <el-option
-            v-for="item in card.entertainments"
-            :key="item"
-            :label="item"
-            :value="item"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="人数">
-        <el-input-number
-          v-model="timerForm.currentUsers"
-          :min="1"
-          :max="card.capacity"
-          controls-position="right"
-          style="width: 100%"
-        />
-      </el-form-item>
-      <el-form-item label="开始时间">
-        <el-time-picker
-          v-model="timerForm.startTime"
-          placeholder="选择开始时间"
-          format="HH:mm:ss"
-          value-format="HH:mm:ss"
-          style="width: 100%"
-        />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="showTimerDialog = false">取消</el-button>
-      <el-button type="primary" @click="confirmStartTimer">确认开始</el-button>
-    </template>
-  </el-dialog>
+  <StartTimerDialog
+    v-model:visible="showTimerDialog"
+    :entertainments="card.entertainments"
+    :capacity="card.capacity"
+    @confirm="handleStartTimerConfirm"
+  />
 
   <!-- 拼桌对话框 -->
-  <el-dialog
-    v-model="showAddPersonDialog"
-    title="拼桌"
-    width="500px"
-    append-to-body
-    @close="resetAddPersonForm"
-  >
-    <el-form :model="addPersonForm" label-width="100px">
-      <el-form-item label="拼桌人数">
-        <el-input-number
-          v-model="addPersonForm.users"
-          :min="1"
-          :max="card.capacity - card.currentUsers"
-          controls-position="right"
-          style="width: 100%"
-        />
-      </el-form-item>
-      <el-form-item label="开始时间">
-        <el-time-picker
-          v-model="addPersonForm.startTime"
-          placeholder="默认为当前时间"
-          format="HH:mm:ss"
-          value-format="HH:mm:ss"
-          style="width: 100%"
-        />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="showAddPersonDialog = false">取消</el-button>
-      <el-button type="primary" @click="confirmAddPerson">确认拼桌</el-button>
-    </template>
-  </el-dialog>
+  <AddPersonDialog
+    v-model:visible="showAddPersonDialog"
+    :max-add-users="card.capacity - card.currentUsers"
+    @confirm="handleAddPersonConfirm"
+  />
 
   <!-- 中途结算对话框 -->
   <el-dialog
@@ -1568,53 +1501,12 @@
   </el-dialog>
 
   <!-- 预约对话框 -->
-  <el-dialog
-    v-model="showBookingDialog"
-    title="预约桌台"
-    width="500px"
-    append-to-body
-    @close="resetBookingForm"
-  >
-    <el-form
-      ref="bookingFormRef"
-      :model="bookingForm"
-      :rules="bookingRules"
-      label-width="100px"
-    >
-      <el-form-item label="桌台编号">
-        <el-input v-model="bookingForm.tableCode" disabled />
-      </el-form-item>
-      <el-form-item label="预约人数" prop="bookingUsers">
-        <el-input-number
-          v-model="bookingForm.bookingUsers"
-          :min="1"
-          :max="card.capacity"
-          controls-position="right"
-          style="width: 100%"
-        />
-      </el-form-item>
-      <el-form-item label="预约时间" prop="bookingTime">
-        <el-date-picker
-          v-model="bookingForm.bookingTime"
-          type="datetime"
-          placeholder="选择预约时间"
-          style="width: 100%"
-          format="YYYY-MM-DD HH:mm"
-        />
-      </el-form-item>
-      <el-form-item label="预留手机号" prop="phone">
-        <el-input
-          v-model="bookingForm.phone"
-          placeholder="请输入预留手机号"
-          maxlength="11"
-        />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="showBookingDialog = false">取消</el-button>
-      <el-button type="primary" @click="confirmBooking">确认预约</el-button>
-    </template>
-  </el-dialog>
+  <BookingDialog
+    v-model:visible="showBookingDialog"
+    :table-id="card.id"
+    :capacity="card.capacity"
+    @confirm="handleBookingConfirm"
+  />
 </template>
 
 <script setup lang="ts">
@@ -1629,6 +1521,9 @@ import {
   Plus,
   Close,
 } from "@element-plus/icons-vue"
+import BookingDialog from "./card/dialogs/BookingDialog.vue"
+import StartTimerDialog from "./card/dialogs/StartTimerDialog.vue"
+import AddPersonDialog from "./card/dialogs/AddPersonDialog.vue"
 
 defineOptions({
   name: "CardComponent",
@@ -1790,11 +1685,11 @@ const showSettleDialog = ref(false) // 结算确认对话框
 const showOrdersDialog = ref(false) // 订单详情对话框
 const showAddPersonDialog = ref(false) // 拼桌对话框
 
-// 拼桌表单
-const addPersonForm = ref({
-  users: 1,
-  startTime: null as string | null,
-})
+// 拼桌处理
+const handleAddPersonConfirm = (data: { users: number; startTimestamp: number }) => {
+  emit("add-person", props.card.id, data)
+  showAddPersonDialog.value = false
+}
 
 // 中途结算对话框
 const showMidSettleDialog = ref(false)
@@ -1940,135 +1835,27 @@ const loadPackages = async () => {
   }
 }
 
-// 计时表单
-const timerForm = ref({
-  entertainment: "",
-  currentUsers: 1,
-  startTime: "",
-})
+// 开始计时处理
+const handleStartTimerConfirm = (data: { entertainment: string; currentUsers: number; startTimestamp: number }) => {
+  emit("start", props.card.id, data)
+  showTimerDialog.value = false
+}
 
-// 预约表单
-const bookingFormRef = ref<FormInstance>()
-const bookingForm = ref({
-  tableCode: "",
-  bookingUsers: 1,
-  bookingTime: null as Date | null,
-  phone: "",
-})
-
-const bookingRules = ref<FormRules>({
-  bookingUsers: [
-    { required: true, message: "请输入预约人数", trigger: "blur" },
-    {
-      validator: (rule: any, value: number, callback: any) => {
-        if (value < props.card.minBooking) {
-          callback(new Error(`预约人数不能少于${props.card.minBooking}人`))
-        } else if (value > props.card.capacity) {
-          callback(new Error(`预约人数不能超过${props.card.capacity}人`))
-        } else {
-          callback()
-        }
-      },
-      trigger: "blur",
-    },
-  ],
-  bookingTime: [
-    { required: true, message: "请选择预约时间", trigger: "change" },
-  ],
-  phone: [
-    { required: true, message: "请输入预留手机号", trigger: "blur" },
-    {
-      pattern: /^1[3-9]\d{9}$/,
-      message: "请输入正确的手机号",
-      trigger: "blur",
-    },
-  ],
-})
+// 预约处理
+const handleBookingConfirm = (data: { tableCode: string; bookingUsers: number; bookingTime: Date | null; phone: string }) => {
+  emit("booking", props.card.id, { ...data, tableCode: props.card.id })
+  showBookingDialog.value = false
+  ElMessage.success(`桌台 ${props.card.id} 预约成功！`)
+}
 
 // 点击卡片显示详情
 const handleCardClick = () => {
-  if (props.card.isDisabled) return // 禁用的卡片不允许点击
+  if (props.card.isDisabled) return
   showDetailDialog.value = true
-}
-
-const resetTimerForm = () => {
-  timerForm.value = {
-    entertainment: "",
-    currentUsers: 1,
-    startTime: "",
-  }
-}
-
-const confirmStartTimer = () => {
-  if (!timerForm.value.entertainment) {
-    ElMessage.warning("请选择娱乐类型")
-    return
-  }
-
-  // 计算开始时间的时间戳
-  let startTimestamp: number
-  if (timerForm.value.startTime) {
-    // 如果选择了开始时间，使用选择的时间
-    const now = new Date()
-    const [hours, minutes, seconds] = timerForm.value.startTime
-      .split(":")
-      .map(Number)
-    now.setHours(hours, minutes, seconds, 0)
-    startTimestamp = now.getTime()
-  } else {
-    // 否则使用当前时间
-    startTimestamp = Date.now()
-  }
-
-  emit("start", props.card.id, {
-    entertainment: timerForm.value.entertainment,
-    currentUsers: timerForm.value.currentUsers,
-    startTimestamp: startTimestamp,
-  })
-  showTimerDialog.value = false
-  resetTimerForm()
 }
 
 const shareTable = () => {
   emit("share", props.card.id)
-}
-
-// 拼桌相关函数
-const openAddPersonDialog = () => {
-  addPersonForm.value = { users: 1, startTime: null as string | null }
-  showAddPersonDialog.value = true
-}
-
-const resetAddPersonForm = () => {
-  addPersonForm.value = { users: 1, startTime: null as string | null }
-}
-
-const confirmAddPerson = () => {
-  if (addPersonForm.value.users <= 0) {
-    ElMessage.warning("请输入拼桌人数")
-    return
-  }
-  const remaining = props.card.capacity - (props.card.currentUsers || 0)
-  if (addPersonForm.value.users > remaining) {
-    ElMessage.warning(`桌台最多还能加 ${remaining} 人`)
-    return
-  }
-  let startTimestamp: number
-  if (addPersonForm.value.startTime) {
-    const now = new Date()
-    const [hours, minutes, seconds] = addPersonForm.value.startTime
-      .split(":")
-      .map(Number)
-    now.setHours(hours, minutes, seconds, 0)
-    startTimestamp = now.getTime()
-  } else {
-    startTimestamp = Date.now()
-  }
-  emit("add-person", props.card.id, {
-    users: addPersonForm.value.users,
-    startTimestamp,
-  })
-  showAddPersonDialog.value = false
 }
 
 // ---- 中途结算 ----
@@ -2397,37 +2184,8 @@ const handleStartFromDetail = () => {
 }
 
 const handleBooking = () => {
-  // 初始化预约表单
-  bookingForm.value = {
-    tableCode: props.card.id,
-    bookingUsers: props.card.minBooking,
-    bookingTime: null,
-    phone: "",
-  }
   showDetailDialog.value = false
   showBookingDialog.value = true
-}
-
-const resetBookingForm = () => {
-  bookingFormRef.value?.clearValidate()
-  bookingForm.value = {
-    tableCode: "",
-    bookingUsers: 1,
-    bookingTime: null,
-    phone: "",
-  }
-}
-
-const confirmBooking = async () => {
-  if (!bookingFormRef.value) return
-
-  await bookingFormRef.value.validate((valid) => {
-    if (valid) {
-      emit("booking", props.card.id, { ...bookingForm.value })
-      showBookingDialog.value = false
-      ElMessage.success(`预约成功！桌台 ${props.card.id}`)
-    }
-  })
 }
 
 // 取消预约
