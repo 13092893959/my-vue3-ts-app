@@ -16,7 +16,15 @@
       "Bash(cp -r \"d:/code/my-vue3-ts-app/dist\" \"d:/code/my-vue3-ts-app/deployment/backend/server/dist\")",
       "Bash(node \"d:\\\\code\\\\my-vue3-ts-app-2\\\\server\\\\init-data.js\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5174)",
-      "Bash(node test-settle.mjs)"
+      "Bash(node test-settle.mjs)",
+      "Bash(git -C d:\\\\code\\\\my-vue3-ts-app-2 log --oneline -20)",
+      "Bash(git -C \"d:/code/my-vue3-ts-app-2\" log --oneline -10)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(curl -s http://localhost:3000/api/members)",
+      "Bash(curl -s http://localhost:3000/api/statistics/overview)",
+      "Bash(kill %1)",
+      "Bash(npm i *)",
+      "Bash(npx vitest *)"
     ]
   }
 }
