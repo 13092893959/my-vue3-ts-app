@@ -1,16 +1,5 @@
 import fs from 'fs'
-import path from 'path'
-
-const DATA_DIR = 'D:/data/baiwancheli'
-const DATA_FILES = {
-  members: path.join(DATA_DIR, 'members.json'),
-  rechargeRecords: path.join(DATA_DIR, 'recharge-records.json'),
-  consumptionRecords: path.join(DATA_DIR, 'consumption-records.json'),
-  tables: path.join(DATA_DIR, 'tables.json'),
-  orders: path.join(DATA_DIR, 'orders.json'),
-  snacks: path.join(DATA_DIR, 'snacks.json'),
-  packages: path.join(DATA_DIR, 'packages.json')
-}
+import { DATA_DIR, DATA_FILES } from './constants.js'
 
 // 确保数据目录存在
 if (!fs.existsSync(DATA_DIR)) {
@@ -45,7 +34,8 @@ const initialTables = Array.from({ length: 6 }, (_, index) => ({
   isDisabled: false,
   startTimestamp: null, // 开始计时的时间戳
   currentOrderRemark: "", // 当前订单备注
-  currentOrderSnacks: [] // 当前订单零食列表
+  currentOrderSnacks: [], // 当前订单零食列表
+  timerSessions: [] // 计时批次
 }))
 
 // 初始零食数据（为空，不设置默认数据）
