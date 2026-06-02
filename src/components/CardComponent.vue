@@ -53,9 +53,33 @@
       <span>预约</span>
     </div> -->
 
+    <!-- 挂账待结横幅 -->
+    <div
+      v-if="
+        !card.isInUse &&
+        card.deferredOrders && card.deferredOrders.length > 0 && card.status === '待结'
+      "
+      class="pending-banner"
+    >
+      <div class="pending-title">
+        <el-icon><WarningFilled /></el-icon>
+        挂账待结 · {{ card.deferredOrders.length }}笔
+      </div>
+    </div>
+
     <!-- 使用中模式：显示计时器 -->
     <div v-if="card.isInUse" class="timer-banner">
-      <div class="timer-title">计时中 · {{ card.currentUsers }}人</div>
+      <div class="timer-title">
+        计时中 · {{ card.currentUsers }}人
+        <el-tag
+          v-if="card.deferredOrders && card.deferredOrders.length > 0"
+          type="warning"
+          size="small"
+          style="margin-left: 8px"
+        >
+          挂账 {{ card.deferredOrders.length }}笔
+        </el-tag>
+      </div>
       <div class="timer-entertainment" v-if="card.currentEntertainment">
         {{ card.currentEntertainment }}
       </div>
@@ -133,8 +157,31 @@
 
     <!-- 底部操作按钮 -->
     <template #footer>
+      <!-- 挂账待结模式 -->
+      <div
+        v-if="
+          card.deferredOrders &&
+          card.deferredOrders.length > 0 &&
+          !card.isInUse &&
+          card.status === '待结'
+        "
+        class="action-row-pending"
+      >
+        <el-tag type="warning" size="large" style="margin-bottom: 8px">
+          挂账待结 · {{ card.deferredOrders.length }}笔
+        </el-tag>
+        <el-button
+          type="warning"
+          size="large"
+          @click.stop="emit('settle-deferred', card.id)"
+          style="width: 100%"
+        >
+          结算挂账
+        </el-button>
+      </div>
+
       <!-- 空闲模式：开始计时按钮 -->
-      <div v-if="!card.isInUse" class="action-row-idle">
+      <div v-else-if="!card.isInUse" class="action-row-idle">
         <el-button
           type="primary"
           size="large"
@@ -366,7 +413,14 @@
         </el-input-number>
       </el-form-item>
 
-      <el-form-item label="支付方式">
+      <el-form-item label="挂账">
+        <el-switch v-model="midSettleForm.deferPayment" />
+        <span style="margin-left: 8px; color: #909399; font-size: 12px">
+          暂不支付，费用合并到最后结算
+        </span>
+      </el-form-item>
+
+      <el-form-item label="支付方式" v-if="!midSettleForm.deferPayment">
         <el-radio-group v-model="midSettleForm.paymentMethod">
           <el-radio label="member_balance" :disabled="!midSettleSelectedMember"
             >余额支付</el-radio
@@ -439,7 +493,9 @@
 
     <template #footer>
       <el-button @click="showMidSettleDialog = false">取消</el-button>
-      <el-button type="primary" @click="confirmMidSettle">确认结算</el-button>
+      <el-button type="primary" @click="confirmMidSettle">
+        {{ midSettleForm.deferPayment ? "确认离场（挂账）" : "确认结算" }}
+      </el-button>
     </template>
   </el-dialog>
 
@@ -1036,6 +1092,36 @@
         </div>
       </template>
 
+      <template v-if="deferredOrderList.length > 0">
+        <el-divider>挂账订单（{{ deferredOrderList.length }}笔）</el-divider>
+        <el-table :data="deferredOrderList" border size="small" style="margin-bottom: 12px">
+          <el-table-column prop="sessionLabel" label="批次" width="100" />
+          <el-table-column prop="leavingUsers" label="人数" width="60">
+            <template #default="{ row }">{{ row.leavingUsers }}人</template>
+          </el-table-column>
+          <el-table-column label="到达" width="100">
+            <template #default="{ row }">{{ formatStartTime(row.startTime) }}</template>
+          </el-table-column>
+          <el-table-column label="离开" width="100">
+            <template #default="{ row }">{{ formatStartTime(row.endTime) }}</template>
+          </el-table-column>
+          <el-table-column label="时长" width="80">
+            <template #default="{ row }">{{ row.duration }}分钟</template>
+          </el-table-column>
+          <el-table-column prop="packageNames" label="套餐" min-width="100">
+            <template #default="{ row }">{{ row.packageNames || '-' }}</template>
+          </el-table-column>
+          <el-table-column prop="memberName" label="会员" width="80">
+            <template #default="{ row }">{{ row.memberName || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="金额" width="90">
+            <template #default="{ row }">¥{{ row.amount.toFixed(2) }}</template>
+          </el-table-column>
+        </el-table>
+        <div style="text-align: right; font-weight: bold; margin-bottom: 8px">
+          挂账合计：<span style="color: #e6a23c">¥{{ deferredTotal.toFixed(2) }}</span>
+        </div>
+      </template>
       <div class="settle-item highlight final-price">
         <span class="settle-label">应付金额</span>
         <span class="settle-value price"
@@ -1558,6 +1644,11 @@ type CardProps = {
       startTimestamp: number
       label: string
     }>
+    deferredOrders?: Array<{
+      id: string; sessionLabel: string; leavingUsers: number
+      startTime: number; endTime: number; duration: number
+      amount: number; packageNames: string; memberName?: string
+    }>
   }
 }
 
@@ -1599,6 +1690,7 @@ const emit = defineEmits<{
       selectedPackageIds?: string[]
       snacks?: any[]
       snackTotal?: number
+      deferredOrders?: any[]
     },
   ): void
   (e: "settle-multi", id: string, groups: SettleGroup[]): void
@@ -1620,6 +1712,7 @@ const emit = defineEmits<{
       finalAmount: number
       paymentMethod: string
       assignedSnacks: Record<number, number>
+      deferPayment?: boolean
     },
   ): void
   (e: "booking", id: string, bookingData: any): void
@@ -1627,6 +1720,7 @@ const emit = defineEmits<{
   (e: "edit", id: string): void
   (e: "disable", id: string): void
   (e: "enable", id: string): void
+  (e: "settle-deferred", id: string): void
   (e: "update-remark", id: string, remark: string): void
   (e: "update-snacks", id: string, snacks: any[]): void
 }>()
@@ -1686,7 +1780,10 @@ const showOrdersDialog = ref(false) // 订单详情对话框
 const showAddPersonDialog = ref(false) // 拼桌对话框
 
 // 拼桌处理
-const handleAddPersonConfirm = (data: { users: number; startTimestamp: number }) => {
+const handleAddPersonConfirm = (data: {
+  users: number
+  startTimestamp: number
+}) => {
   emit("add-person", props.card.id, data)
   showAddPersonDialog.value = false
 }
@@ -1702,6 +1799,7 @@ const midSettleForm = ref({
   discount: 100,
   finalAmount: 0,
   paymentMethod: "package",
+  deferPayment: false,
 })
 const midSettleSelectedMember = ref<any>(null)
 const midSettleSnackAssignment = ref<Record<number, number>>({})
@@ -1770,8 +1868,8 @@ const totalAssignedUsers = computed(() =>
 )
 
 const snackGroupAssignment = ref<Record<number, Record<string, number>>>({}) // snackIndex -> { groupId: quantity }
-const settleDialogInitialized = ref(false)
-
+const deferredTotal = ref(0)
+const deferredOrderList = ref<any[]>([])
 // 按人均计算相关状态
 const usePerPersonCalc = ref(false)
 const perPersonAmount = ref(0)
@@ -1836,13 +1934,22 @@ const loadPackages = async () => {
 }
 
 // 开始计时处理
-const handleStartTimerConfirm = (data: { entertainment: string; currentUsers: number; startTimestamp: number }) => {
+const handleStartTimerConfirm = (data: {
+  entertainment: string
+  currentUsers: number
+  startTimestamp: number
+}) => {
   emit("start", props.card.id, data)
   showTimerDialog.value = false
 }
 
 // 预约处理
-const handleBookingConfirm = (data: { tableCode: string; bookingUsers: number; bookingTime: Date | null; phone: string }) => {
+const handleBookingConfirm = (data: {
+  tableCode: string
+  bookingUsers: number
+  bookingTime: Date | null
+  phone: string
+}) => {
   emit("booking", props.card.id, { ...data, tableCode: props.card.id })
   showBookingDialog.value = false
   ElMessage.success(`桌台 ${props.card.id} 预约成功！`)
@@ -1877,6 +1984,7 @@ const openMidSettleDialog = async () => {
     discount: 100,
     finalAmount: 0,
     paymentMethod: "package",
+    deferPayment: false,
   }
   midSettleSelectedMember.value = null
   midSettleSnackAssignment.value = {}
@@ -1994,8 +2102,11 @@ const confirmMidSettle = () => {
     totalAmount: midSettleForm.value.totalAmount,
     discount: midSettleForm.value.discount,
     finalAmount: midSettleForm.value.finalAmount,
-    paymentMethod: midSettleForm.value.paymentMethod,
+    paymentMethod: midSettleForm.value.deferPayment
+      ? "deferred"
+      : midSettleForm.value.paymentMethod,
     assignedSnacks: { ...midSettleSnackAssignment.value },
+    deferPayment: midSettleForm.value.deferPayment,
   })
   showMidSettleDialog.value = false
 }
@@ -2358,46 +2469,63 @@ const openSettleDialog = async () => {
   groupUsePerPerson.value = {}
   groupPerPersonAmounts.value = {}
 
-  // 首次打开才初始化分组，之后保留用户已填数据
-  if (!settleDialogInitialized.value) {
+  // 每次打开都按当前 timerSessions 同步分组
+  {
     useSplitBill.value = false
     snackGroupAssignment.value = {}
     const snacks = getSnacks()
 
-    // 如果有 timerSessions，按批次预填充分组
     if (props.card.timerSessions && props.card.timerSessions.length > 0) {
       const sessions = props.card.timerSessions
-      settleGroups.value = sessions.map((s, i) => ({
-        id: `group-${Date.now()}-${i}`,
-        label: `分组 ${i + 1} (${s.users}人)`,
-        users: s.users,
-        memberId: null,
-        selectedPackageIds: [],
-        totalAmount: 0,
-        discount: 100,
-        finalAmount: 0,
-        paymentMethod: "package" as string,
-        assignedSnacks: {} as Record<number, number>,
-      }))
-      // 如果有多个批次，自动开启拆单
+      // 保留已有分组的填写数据（按序号匹配）
+      const oldGroups = [...settleGroups.value]
+      settleGroups.value = sessions.map((s, i) => {
+        const old = oldGroups[i]
+        return {
+          id: old?.id || `group-${Date.now()}-${i}`,
+          label: `分组 ${i + 1} (${s.users}人)`,
+          users: s.users,
+          memberId: old?.memberId ?? null,
+          selectedPackageIds: old?.selectedPackageIds ?? [],
+          totalAmount: old?.totalAmount ?? 0,
+          discount: old?.discount ?? 100,
+          finalAmount: 0,
+          paymentMethod: old?.paymentMethod ?? "package",
+          assignedSnacks: old?.assignedSnacks ?? {} as Record<number, number>,
+        }
+      })
       if (sessions.length > 1) {
         useSplitBill.value = true
       }
-      // 默认零食全归第一组
       const firstGroupId = settleGroups.value[0].id
       snacks.forEach((s: any, i: number) => {
         snackGroupAssignment.value[i] = { [firstGroupId]: s.quantity }
       })
     } else {
-      settleGroups.value = [createDefaultGroup()]
+      const old = settleGroups.value[0]
+      settleGroups.value = [{
+        id: old?.id || `group-${Date.now()}-0`,
+        label: "分组 1",
+        users: props.card.currentUsers || 0,
+        memberId: old?.memberId ?? null,
+        selectedPackageIds: old?.selectedPackageIds ?? [],
+        totalAmount: old?.totalAmount ?? 0,
+        discount: old?.discount ?? 100,
+        finalAmount: 0,
+        paymentMethod: old?.paymentMethod ?? "package",
+        assignedSnacks: old?.assignedSnacks ?? {} as Record<number, number>,
+      }]
       const firstGroupId = settleGroups.value[0].id
       snacks.forEach((_: any, i: number) => {
         snackGroupAssignment.value[i] = { [firstGroupId]: snacks[i].quantity }
       })
     }
     activeGroupId.value = settleGroups.value[0].id
-    settleDialogInitialized.value = true
   }
+
+  // 加载挂账信息（只展示，不自动填入总金额）
+  deferredOrderList.value = props.card.deferredOrders || []
+  deferredTotal.value = deferredOrderList.value.reduce((s, o) => s + (o.amount || 0), 0)
 
   // 加载会员列表和套餐列表
   await Promise.all([loadMembers(), loadPackages()])
@@ -2748,6 +2876,9 @@ const confirmSettle = () => {
       selectedPackageIds: settleForm.value.selectedPackageIds,
       snacks: currentOrder.value?.snacks || [],
       snackTotal: calculateSnackTotal(),
+      deferredOrders: props.card.deferredOrders?.length
+        ? [...props.card.deferredOrders]
+        : undefined,
     })
   }
   showSettleDialog.value = false

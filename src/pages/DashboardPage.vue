@@ -29,6 +29,7 @@
                 @enable="enableCard"
                 @update-remark="updateCardRemark"
                 @update-snacks="updateCardSnacks"
+                @settle-deferred="settleCardDeferred"
               />
             </div>
           </div>
@@ -512,6 +513,8 @@ const settleCardMidway = async (
     0,
   )
 
+  const isDeferred = (data as any).deferPayment === true
+
   const orderData: any = {
     tableId: card.id,
     tableCode: card.id,
@@ -526,7 +529,7 @@ const settleCardMidway = async (
     memberId: data.memberId || null,
     memberPhone: memberInfo?.phone || null,
     memberName: memberInfo?.name || null,
-    paymentMethod: data.paymentMethod || "cash",
+    paymentMethod: isDeferred ? "deferred" : (data.paymentMethod || "cash"),
     cardType: memberInfo?.cardType || null,
     packageIds: data.selectedPackageIds || [],
     packageNames: packageInfos.map((p: any) => p.name).join(", "),
@@ -537,6 +540,7 @@ const settleCardMidway = async (
     isMidwaySettlement: true,
     parentSessionId: session.id,
     parentSessionLabel: session.label,
+    status: isDeferred ? "pending" : "completed",
   }
 
   try {
@@ -550,8 +554,24 @@ const settleCardMidway = async (
     if (!orderResult.success)
       throw new Error(orderResult.message || "创建订单失败")
 
-    // Process member payment
-    if (data.paymentMethod === "member_balance" && memberInfo) {
+    // Track deferred order with full summary
+    if (isDeferred && orderResult.data?.id) {
+      if (!card.deferredOrders) card.deferredOrders = []
+      card.deferredOrders.push({
+        id: orderResult.data.id,
+        sessionLabel: session.label,
+        leavingUsers: data.leavingUsers,
+        startTime: session.startTimestamp,
+        endTime,
+        duration: durationMinutes,
+        amount: data.finalAmount,
+        packageNames: packageInfos.map((p: any) => p.name).join(", "),
+        memberName: memberInfo?.name || undefined,
+      })
+    }
+
+    // Process member payment (skip if deferred)
+    if (!isDeferred && data.paymentMethod === "member_balance" && memberInfo) {
       await processMemberPayment(
         memberInfo,
         data.finalAmount,
@@ -594,30 +614,88 @@ const settleCardMidway = async (
       })
     }
 
-    // If all sessions empty, full settle
+    // If all sessions empty
     if (
       !card.timerSessions ||
       card.timerSessions.length === 0 ||
       card.currentUsers <= 0
     ) {
-      card.isInUse = false
-      card.isBooked = false
-      card.bookingInfo = null
-      card.status = "空闲"
-      card.currentUsers = 0
-      card.currentEntertainment = undefined
-      card.startTimestamp = null
-      card.initialMinutes = undefined
-      card.currentOrderRemark = ""
-      card.currentOrderSnacks = []
-      card.timerSessions = []
+      const hasDeferred = card.deferredOrders && card.deferredOrders.length > 0
+      if (hasDeferred) {
+        // 挂账待结：保持桌台活跃，进入待结状态
+        card.status = "待结"
+        card.currentUsers = 0
+        card.timerSessions = []
+      } else {
+        // 普通结算：重置桌台
+        card.isInUse = false
+        card.isBooked = false
+        card.bookingInfo = null
+        card.status = "空闲"
+        card.currentUsers = 0
+        card.currentEntertainment = undefined
+        card.startTimestamp = null
+        card.initialMinutes = undefined
+        card.currentOrderRemark = ""
+        card.currentOrderSnacks = []
+        card.timerSessions = []
+      }
     }
 
     saveCards()
-    ElMessage.success(`中途结算完成，${data.leavingUsers}人已离场`)
+    const msg = isDeferred
+      ? `${data.leavingUsers}人已挂账离场，费用将合并到最后结算`
+      : `中途结算完成，${data.leavingUsers}人已离场`
+    ElMessage.success(msg)
   } catch (error) {
     console.error("中途结算失败:", error)
     ElMessage.error(error instanceof Error ? error.message : "中途结算失败")
+  }
+}
+
+/** 结算所有挂账订单 */
+const settleCardDeferred = async (id: string) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (!card || !card.deferredOrders?.length) return
+
+  const deferredTotal = card.deferredOrders.reduce((s, o) => s + (o.amount || 0), 0)
+
+  try {
+    await ElMessageBox.confirm(
+      `该桌台有 ${card.deferredOrders.length} 笔挂账订单，合计 ¥${deferredTotal.toFixed(2)}，确认结算？`,
+      "结算挂账",
+      { confirmButtonText: "确认结算", cancelButtonText: "取消", type: "warning" },
+    )
+
+    // 将所有挂账订单标记为已完成
+    for (const order of card.deferredOrders) {
+      await fetch(`http://localhost:3000/api/orders/${order.id}/remark`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      })
+    }
+
+    // 重置桌台
+    card.deferredOrders = []
+        card.isInUse = false
+    card.isBooked = false
+    card.bookingInfo = null
+    card.status = "空闲"
+    card.currentUsers = 0
+    card.currentEntertainment = undefined
+    card.startTimestamp = null
+    card.initialMinutes = undefined
+    card.currentOrderRemark = ""
+    card.currentOrderSnacks = []
+    card.timerSessions = []
+    saveCards()
+    ElMessage.success(`挂账结算完成，合计 ¥${deferredTotal.toFixed(2)}`)
+  } catch (error: any) {
+    if (error !== "cancel") {
+      console.error("挂账结算失败:", error)
+      ElMessage.error("挂账结算失败")
+    }
   }
 }
 
@@ -632,6 +710,7 @@ const settleCard = async (
     selectedPackageIds?: string[]
     snacks?: any[]
     snackTotal?: number
+    deferredOrders?: any[]
   },
 ) => {
   const card = cards.value.find((c) => c.id === id)
@@ -724,6 +803,19 @@ const settleCard = async (
         throw new Error(orderResult.message || "创建订单失败")
       }
 
+      // 1.5 将挂账订单标记为已完成
+      if (settleData.deferredOrders?.length) {
+        for (const order of settleData.deferredOrders) {
+          try {
+            await fetch(`http://localhost:3000/api/orders/${order.id}/remark`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: "completed" }),
+            })
+          } catch (e) { /* 忽略单个更新失败 */ }
+        }
+      }
+
       // 2. 更新零食库存
       if (orderData.snacks && orderData.snacks.length > 0) {
         await updateSnackStock(orderData.snacks)
@@ -744,6 +836,11 @@ const settleCard = async (
       card.isBooked = false
       card.bookingInfo = null
       card.status = "空闲"
+      // 清理挂账信息
+      if (card.deferredOrders?.length) {
+        card.deferredOrders = []
+              }
+
       card.currentUsers = 0
       card.currentEntertainment = undefined
       card.startTimestamp = null
@@ -916,6 +1013,11 @@ const settleCardMulti = async (id: string, groups: SettleGroup[]) => {
   if (allAssignedSnacks.length > 0) {
     await updateSnackStock(allAssignedSnacks)
   }
+
+  // 清理挂账信息
+  if (card.deferredOrders?.length) {
+    card.deferredOrders = []
+      }
 
   // 重置桌台状态
   card.isInUse = false

@@ -39,7 +39,7 @@ router.post('/', (req, res) => {
 
 router.put('/:orderId/remark', (req, res) => {
   try {
-    const order = orderService.updateOrderRemark(req.params.orderId, req.body.remark)
+    const order = orderService.updateOrderRemark(req.params.orderId, req.body)
     res.json({ success: true, data: order })
   } catch (error) {
     console.error('更新订单备注失败:', error)

@@ -44,6 +44,7 @@ export interface MidSettleData {
   finalAmount: number
   paymentMethod: string
   assignedSnacks: Record<number, number>
+  deferPayment?: boolean // 挂账（暂不支付，合并到最后结算）
 }
 
 /** 加人 emit 数据 */

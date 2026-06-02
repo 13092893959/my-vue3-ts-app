@@ -30,6 +30,17 @@ export interface CardData {
   currentOrderRemark?: string
   currentOrderSnacks?: unknown[]
   timerSessions?: TimerSession[]
+  deferredOrders?: Array<{
+    id: string
+    sessionLabel: string
+    leavingUsers: number
+    startTime: number
+    endTime: number
+    duration: number
+    amount: number
+    packageNames: string
+    memberName?: string
+  }>
 }
 
 /** CardComponent 的 props 类型 */
