@@ -49,6 +49,156 @@
         </div>
       </el-tab-pane>
 
+      <!-- 备份管理 -->
+      <el-tab-pane label="💾 备份管理" name="backup">
+        <div class="tab-content backup-content">
+          <!-- 备份设置 -->
+          <el-card shadow="never" class="backup-card">
+            <template #header><span style="font-weight:600">备份设置</span></template>
+            <el-form label-width="140px" size="default">
+              <el-form-item label="启用自动监测">
+                <el-switch v-model="backupConfig.autoMonitorEnabled" @change="saveBackupConfig" />
+                <span class="form-tip" style="margin-left:8px">自动检测U盘插入</span>
+              </el-form-item>
+              <el-form-item label="U盘自动备份" v-if="backupConfig.autoMonitorEnabled">
+                <el-switch v-model="backupConfig.usbBackupEnabled" @change="saveBackupConfig" />
+                <span class="form-tip" style="margin-left:8px">检测到U盘时自动备份数据</span>
+              </el-form-item>
+              <el-form-item label="启用定时备份">
+                <el-switch v-model="backupConfig.scheduleEnabled" @change="saveBackupConfig" />
+              </el-form-item>
+              <el-form-item v-if="backupConfig.scheduleEnabled" label="备份时间">
+                <el-time-picker
+                  v-model="backupConfig.scheduleTime"
+                  format="HH:mm"
+                  value-format="HH:mm"
+                  placeholder="选择备份时间"
+                  @change="saveBackupConfig"
+                />
+                <span class="form-tip" style="margin-left:8px">每天定时执行本地备份</span>
+              </el-form-item>
+              <el-form-item label="保留备份数">
+                <el-input-number
+                  v-model="backupConfig.maxBackupCount"
+                  :min="5"
+                  :max="100"
+                  @change="saveBackupConfig"
+                />
+                <span class="form-tip" style="margin-left:8px">U盘上保留最近N个备份</span>
+              </el-form-item>
+            </el-form>
+          </el-card>
+
+          <!-- U盘状态 -->
+          <el-card shadow="never" class="backup-card">
+            <template #header>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-weight:600">U盘状态</span>
+                <el-button size="small" @click="refreshUsbDrives" :loading="usbLoading">
+                  <el-icon><Refresh /></el-icon> 刷新
+                </el-button>
+              </div>
+            </template>
+            <el-empty v-if="usbDrives.length === 0" description="未检测到 U 盘" :image-size="60" />
+            <el-table v-else :data="usbDrives" size="small" stripe>
+              <el-table-column prop="DeviceID" label="盘符" width="80" />
+              <el-table-column prop="VolumeName" label="卷标" min-width="120">
+                <template #default="{ row }">{{ row.VolumeName || '(未命名)' }}</template>
+              </el-table-column>
+              <el-table-column prop="SizeGB" label="总容量" width="110" align="right">
+                <template #default="{ row }">{{ row.SizeGB }} GB</template>
+              </el-table-column>
+              <el-table-column prop="FreeGB" label="可用空间" width="110" align="right">
+                <template #default="{ row }">{{ row.FreeGB }} GB</template>
+              </el-table-column>
+              <el-table-column label="状态" width="100" align="center">
+                <template #default>
+                  <el-tag type="success" size="small">已连接</el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+
+          <!-- 手动操作 -->
+          <el-card shadow="never" class="backup-card">
+            <template #header><span style="font-weight:600">手动备份</span></template>
+            <div style="display:flex;gap:12px;align-items:center">
+              <el-button type="primary" @click="manualBackup('local')" :loading="backupLoading === 'local'">
+                备份到本地
+              </el-button>
+              <el-button
+                type="success"
+                @click="manualBackup('usb')"
+                :disabled="usbDrives.length === 0"
+                :loading="backupLoading === 'usb'"
+              >
+                备份到U盘
+              </el-button>
+              <span v-if="backupConfig.lastBackupTime" style="color:#909399;font-size:12px">
+                上次备份: {{ backupConfig.lastBackupTime }}
+                <el-tag
+                  v-if="backupConfig.lastBackupStatus"
+                  :type="backupConfig.lastBackupStatus === 'success' ? 'success' : 'danger'"
+                  size="small"
+                  style="margin-left:6px"
+                >
+                  {{ backupConfig.lastBackupStatus === 'success' ? '成功' : '失败' }}
+                </el-tag>
+              </span>
+            </div>
+          </el-card>
+
+          <!-- 备份历史 -->
+          <el-card shadow="never" class="backup-card">
+            <template #header>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-weight:600">备份历史</span>
+                <el-button size="small" @click="loadBackupHistory">刷新</el-button>
+              </div>
+            </template>
+            <el-table :data="backupHistory.list" size="small" stripe>
+              <el-table-column prop="time" label="时间" width="170" />
+              <el-table-column prop="type" label="类型" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.type === 'usb' ? 'success' : 'info'" size="small">
+                    {{ row.type === 'usb' ? 'U盘' : '本地' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="目标" min-width="150">
+                <template #default="{ row }">
+                  {{ row.drive ? `${row.drive} (${row.driveLabel || ''})` : row.path }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="fileCount" label="文件数" width="80" align="center" />
+              <el-table-column label="大小" width="100" align="right">
+                <template #default="{ row }">{{ formatFileSize(row.totalSize) }}</template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
+                    {{ row.status === 'success' ? '成功' : '失败' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="error" label="错误信息" min-width="150" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.error || '-' }}</template>
+              </el-table-column>
+            </el-table>
+            <el-pagination
+              v-if="backupHistory.total > 0"
+              style="margin-top:12px;justify-content:flex-end"
+              layout="total, prev, pager, next"
+              :total="backupHistory.total"
+              :page-size="backupHistory.pageSize"
+              :current-page="backupHistory.page"
+              @current-change="loadBackupHistory"
+              small
+            />
+          </el-card>
+        </div>
+      </el-tab-pane>
+
       <!-- 系统主题设置 -->
       <el-tab-pane label="🎨 系统主题设置" name="theme">
         <div class="tab-content theme-content">
@@ -120,7 +270,7 @@
 import { ref, reactive, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Rank } from '@element-plus/icons-vue'
+import { Plus, Rank, Refresh } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
 import { themeConfig, saveTheme, applyTheme } from '../composables/useTheme'
 
@@ -296,6 +446,124 @@ const handleSaveTheme = () => {
   })
   ElMessage.success('主题设置已保存')
 }
+
+// ========== 备份管理 ==========
+const API_BASE = 'http://localhost:3000/api/backup'
+
+const backupConfig = ref({
+  autoMonitorEnabled: true,
+  usbBackupEnabled: true,
+  scheduleEnabled: false,
+  scheduleTime: '02:00',
+  maxBackupCount: 30,
+  lastBackupTime: null as string | null,
+  lastBackupStatus: null as string | null,
+})
+
+const usbDrives = ref<any[]>([])
+const backupHistory = ref<{ list: any[]; total: number; page: number; pageSize: number }>({
+  list: [],
+  total: 0,
+  page: 1,
+  pageSize: 20,
+})
+const backupLoading = ref<string | null>(null)
+const usbLoading = ref(false)
+
+const loadBackupConfig = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/config`)
+    const result = await res.json()
+    if (result.success) {
+      backupConfig.value = { ...backupConfig.value, ...result.data }
+    }
+  } catch (e) {
+    console.error('加载备份配置失败:', e)
+  }
+}
+
+const saveBackupConfig = async () => {
+  try {
+    const res = await fetch(`${API_BASE}/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(backupConfig.value),
+    })
+    const result = await res.json()
+    if (result.success) {
+      ElMessage.success('备份配置已保存')
+    }
+  } catch (e) {
+    console.error('保存备份配置失败:', e)
+  }
+}
+
+const refreshUsbDrives = async () => {
+  usbLoading.value = true
+  try {
+    const res = await fetch(`${API_BASE}/usb-drives`)
+    const result = await res.json()
+    if (result.success) {
+      usbDrives.value = result.data.drives || []
+    }
+  } catch (e) {
+    console.error('获取U盘列表失败:', e)
+  } finally {
+    usbLoading.value = false
+  }
+}
+
+const manualBackup = async (target: 'local' | 'usb') => {
+  backupLoading.value = target
+  try {
+    const res = await fetch(`${API_BASE}/manual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target }),
+    })
+    const result = await res.json()
+    if (result.success) {
+      ElMessage.success(result.message || '备份完成')
+      loadBackupConfig()
+      loadBackupHistory()
+    } else {
+      ElMessage.error(result.message || '备份失败')
+    }
+  } catch (e) {
+    ElMessage.error('备份请求失败')
+  } finally {
+    backupLoading.value = null
+  }
+}
+
+const loadBackupHistory = async (page = 1) => {
+  try {
+    const res = await fetch(`${API_BASE}/history?page=${page}&pageSize=${backupHistory.value.pageSize}`)
+    const result = await res.json()
+    if (result.success) {
+      backupHistory.value = result.data
+    }
+  } catch (e) {
+    console.error('加载备份历史失败:', e)
+  }
+}
+
+const formatFileSize = (bytes: number) => {
+  if (!bytes || bytes === 0) return '0 B'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
+// 切换到备份 tab 时加载数据
+watch(activeTab, (tab) => {
+  if (tab === 'backup') {
+    loadBackupConfig()
+    refreshUsbDrives()
+    loadBackupHistory()
+  }
+})
+
 
 onMounted(() => {
   loadPackages()

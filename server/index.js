@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import { DATA_DIR, DATA_FILES } from './constants.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { errorHandler } from './middleware/errorHandler.js'
+import { startUsbMonitor, startScheduleChecker } from './services/backupService.js'
 
 import authRoutes from './routes/auth.routes.js'
 import memberRoutes from './routes/members.routes.js'
@@ -16,6 +17,7 @@ import snackRoutes from './routes/snacks.routes.js'
 import packageRoutes from './routes/packages.routes.js'
 import statisticsRoutes from './routes/statistics.routes.js'
 import healthRoutes from './routes/health.routes.js'
+import backupRoutes from './routes/backup.routes.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -70,6 +72,7 @@ app.use('/api/snacks', snackRoutes)
 app.use('/api/packages', packageRoutes)
 app.use('/api/statistics', statisticsRoutes)
 app.use('/api/health', healthRoutes)
+app.use('/api/backup', backupRoutes)
 
 // 全局错误处理（必须在所有路由之后）
 app.use(errorHandler)
@@ -81,4 +84,9 @@ app.listen(port, () => {
   Object.entries(DATA_FILES).forEach(([key, filePath]) => {
     console.log(`  ${key}: ${filePath}`)
   })
+
+  // 启动 USB 监控和定时备份
+  startUsbMonitor()
+  startScheduleChecker()
 })
+

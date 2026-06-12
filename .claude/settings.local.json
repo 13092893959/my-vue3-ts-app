@@ -59,7 +59,31 @@
       "Bash(pkill -f \"node\")",
       "Bash(taskkill //F //IM node.exe)",
       "Bash(rm -rf \"d:/code/my-vue3-ts-app/deployment/frontend/dist\" \"d:/code/my-vue3-ts-app/deployment/backend/server/dist\")",
-      "Bash(cp \"d:/code/my-vue3-ts-app/deployment/backend/server/index.deploy.js\" \"d:/code/my-vue3-ts-app/deployment/backend/server/index.js\")"
+      "Bash(cp \"d:/code/my-vue3-ts-app/deployment/backend/server/index.deploy.js\" \"d:/code/my-vue3-ts-app/deployment/backend/server/index.js\")",
+      "Bash(curl -s http://localhost:3000/api/backup/config)",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s http://localhost:3000/api/backup/usb-drives)",
+      "Bash(curl -s http://localhost:3000/api/backup/history)",
+      "Bash(curl -s http://localhost:3000/api/backup/status)",
+      "Bash(pkill -f node)",
+      "Bash(PORT=3005 node server/index.js)",
+      "Bash(curl -s http://localhost:3005/api/backup/config)",
+      "Bash(curl -s http://localhost:3005/api/health)",
+      "Bash(PORT=3006 node server/index.js)",
+      "Bash(curl -s http://localhost:3006/api/backup/config)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(curl -s http://localhost:3006/api/backup/usb-drives)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Drives:', len\\(d['data']['drives']\\), 'Monitoring:', d['data']['status']['isMonitoring']\\)\")",
+      "Bash(curl -s -X POST http://localhost:3006/api/backup/manual -H \"Content-Type: application/json\" -d '{\"target\":\"local\"}')",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Status:', d['success'], 'Files:', d.get\\('record',{}\\).get\\('fileCount', 'N/A'\\)\\)\")",
+      "Bash(curl -s http://localhost:3006/api/backup/history)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Total records:', d['data']['total']\\)\")",
+      "Read(//d/data/baiwancheli/**)",
+      "Bash(PORT=3007 node server/index.js)",
+      "Bash(curl -s http://localhost:3007/api/backup/config)",
+      "Bash(curl -s http://localhost:3007/api/backup/usb-drives)",
+      "Bash(curl -s -X POST http://localhost:3007/api/backup/config -H \"Content-Type: application/json\" -d '{\"autoMonitorEnabled\":false}')",
+      "Bash(curl -s -X POST http://localhost:3007/api/backup/config -H \"Content-Type: application/json\" -d '{\"autoMonitorEnabled\":true}')"
     ]
   }
 }
