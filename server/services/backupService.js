@@ -288,6 +288,144 @@ export async function backupToLocal() {
   }
 }
 
+// ========== 数据还原 ==========
+
+/** 列出所有可还原的备份点（本地 + USB） */
+export function listRestorePoints() {
+  const points = []
+
+  // 本地备份
+  try {
+    if (fs.existsSync(LOCAL_BACKUP_DIR)) {
+      const dirs = fs.readdirSync(LOCAL_BACKUP_DIR)
+      for (const dir of dirs) {
+        const fullPath = path.join(LOCAL_BACKUP_DIR, dir)
+        try {
+          const stat = fs.statSync(fullPath)
+          if (!stat.isDirectory()) continue
+          const files = fs.readdirSync(fullPath).filter((f) => f.endsWith('.json'))
+          let totalSize = 0
+          for (const f of files) totalSize += fs.statSync(path.join(fullPath, f)).size
+          points.push({
+            type: 'local',
+            path: fullPath,
+            timestamp: dir,
+            fileCount: files.length,
+            totalSize,
+          })
+        } catch {}
+      }
+    }
+  } catch {}
+
+  // USB 备份
+  try {
+    const usbDrives = getUsbDrives()
+    for (const drive of usbDrives) {
+      const usbBackupRoot = path.join(drive.DeviceID + '/', 'baiwancheli-backup')
+      try {
+        if (!fs.existsSync(usbBackupRoot)) continue
+        const dirs = fs.readdirSync(usbBackupRoot)
+        for (const dir of dirs) {
+          const fullPath = path.join(usbBackupRoot, dir)
+          try {
+            const stat = fs.statSync(fullPath)
+            if (!stat.isDirectory()) continue
+            const files = fs.readdirSync(fullPath).filter((f) => f.endsWith('.json'))
+            let totalSize = 0
+            for (const f of files) totalSize += fs.statSync(path.join(fullPath, f)).size
+            points.push({
+              type: 'usb',
+              path: fullPath,
+              drive: `${drive.DeviceID} (${drive.VolumeName || '未命名'})`,
+              timestamp: dir,
+              fileCount: files.length,
+              totalSize,
+            })
+          } catch {}
+        }
+      } catch {}
+    }
+  } catch {}
+
+  // 按时间倒序
+  points.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+  return points
+}
+
+/** 预览备份内容（文件列表） */
+export function previewBackup(backupPath) {
+  try {
+    if (!fs.existsSync(backupPath)) {
+      return { success: false, message: '备份目录不存在' }
+    }
+    const files = fs.readdirSync(backupPath)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => {
+        const stat = fs.statSync(path.join(backupPath, f))
+        return { name: f, size: stat.size }
+      })
+    return { success: true, files }
+  } catch (e) {
+    return { success: false, message: e.message }
+  }
+}
+
+/** 从备份还原数据（带安全备份） */
+export async function restoreFromBackup(backupPath) {
+  if (backupInProgress) return { success: false, message: '备份/还原正在进行中，请稍后再试' }
+  backupInProgress = true
+
+  let preRestoreRecord = null
+  try {
+    if (!fs.existsSync(backupPath)) {
+      backupInProgress = false
+      return { success: false, message: '备份目录不存在' }
+    }
+
+    // 安全机制：还原前自动创建备份（暂时解除锁以允许嵌套备份调用）
+    console.log('[还原] 正在创建恢复前安全备份...')
+    backupInProgress = false
+    const safetyResult = await backupToLocal()
+    preRestoreRecord = safetyResult.record || null
+    backupInProgress = true
+
+    // 执行还原：逐个复制 JSON 文件到 DATA_DIR
+    const files = fs.readdirSync(backupPath).filter((f) => f.endsWith('.json') && !f.startsWith('backup-'))
+    let restored = 0
+    for (const file of files) {
+      const src = path.join(backupPath, file)
+      const dest = path.join(DATA_DIR, file)
+      fs.copyFileSync(src, dest)
+      restored++
+    }
+
+    // 清除 fileStore 内存缓存，让后续读取重新加载
+    try {
+      const { clearCache } = await import('./fileStore.js')
+      clearCache()
+    } catch {}
+
+    const record = createRecord('restore', 'success', null, null, backupPath, restored, 0, null, 0)
+    appendHistory(record)
+
+    console.log(`[还原] 数据还原完成: 从 ${backupPath} 恢复了 ${restored} 个文件`)
+    return {
+      success: true,
+      message: `成功恢复 ${restored} 个文件`,
+      filesRestored: restored,
+      preRestoreBackup: preRestoreRecord,
+    }
+  } catch (e) {
+    console.error('[还原] 数据还原失败:', e.message)
+    return { success: false, message: e.message }
+  } finally {
+    backupInProgress = false
+  }
+}
+
+// ========== 定时备份 ==========
+
 /** 定时备份（被 scheduler 调用） */
 export async function scheduledBackup() {
   console.log('[备份] 执行定时备份...')

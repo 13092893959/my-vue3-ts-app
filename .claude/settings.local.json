@@ -83,7 +83,13 @@
       "Bash(curl -s http://localhost:3007/api/backup/config)",
       "Bash(curl -s http://localhost:3007/api/backup/usb-drives)",
       "Bash(curl -s -X POST http://localhost:3007/api/backup/config -H \"Content-Type: application/json\" -d '{\"autoMonitorEnabled\":false}')",
-      "Bash(curl -s -X POST http://localhost:3007/api/backup/config -H \"Content-Type: application/json\" -d '{\"autoMonitorEnabled\":true}')"
+      "Bash(curl -s -X POST http://localhost:3007/api/backup/config -H \"Content-Type: application/json\" -d '{\"autoMonitorEnabled\":true}')",
+      "Bash(PORT=3009 node server/index.js)",
+      "Bash(curl -s http://localhost:3009/api/backup/restore-points)",
+      "Bash(curl -s \"http://localhost:3009/api/backup/preview?path=D%3A%2Fdata%2Fbaiwancheli%2Fsnapshots%2F2026-06-12-10-12-57\")",
+      "Bash(PORT=3014 node server/index.js)",
+      "Bash(python -c ' *)",
+      "Bash(node -e \"import\\('./server/services/backupService.js'\\).then\\(m => { const h = m.getBackupHistory\\(\\); h.slice\\(0,3\\).forEach\\(r => console.log\\(r.type, r.time, r.status, r.path\\)\\); }\\)\")"
     ]
   }
 }

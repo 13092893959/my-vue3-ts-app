@@ -196,6 +196,47 @@
               small
             />
           </el-card>
+
+          <!-- 数据还原 -->
+          <el-card shadow="never" class="backup-card">
+            <template #header>
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-weight:600">数据还原</span>
+                <el-button size="small" @click="loadRestorePoints" :loading="restoreLoading">刷新</el-button>
+              </div>
+            </template>
+            <el-empty v-if="restorePoints.length === 0" description="暂无可还原的备份" :image-size="60" />
+            <el-table v-else :data="restorePoints" size="small" stripe>
+              <el-table-column prop="timestamp" label="备份时间" width="170" />
+              <el-table-column label="类型" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.type === 'usb' ? 'success' : 'info'" size="small">
+                    {{ row.type === 'usb' ? 'U盘' : '本地' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="来源" min-width="120">
+                <template #default="{ row }">{{ row.drive || row.path }}</template>
+              </el-table-column>
+              <el-table-column prop="fileCount" label="文件数" width="80" align="center" />
+              <el-table-column label="大小" width="100" align="right">
+                <template #default="{ row }">{{ formatFileSize(row.totalSize) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="180" align="center">
+                <template #default="{ row }">
+                  <el-button size="small" @click="openPreviewDialog(row.path)">预览</el-button>
+                  <el-button
+                    size="small"
+                    type="warning"
+                    :disabled="!!restoringPath"
+                    @click="handleRestore(row.path, row.timestamp)"
+                  >
+                    {{ restoringPath === row.path ? '还原中...' : '还原' }}
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
         </div>
       </el-tab-pane>
 
@@ -261,6 +302,19 @@
       <template #footer>
         <el-button @click="showPackageDialog = false">取消</el-button>
         <el-button type="primary" @click="submitPackageForm">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 备份预览对话框 -->
+    <el-dialog v-model="showPreviewDialog" title="备份文件预览" width="500px" append-to-body>
+      <el-table :data="previewFiles" size="small" stripe>
+        <el-table-column prop="name" label="文件名" min-width="200" />
+        <el-table-column label="大小" width="120" align="right">
+          <template #default="{ row }">{{ formatFileSize(row.size) }}</template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="showPreviewDialog = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -469,6 +523,11 @@ const backupHistory = ref<{ list: any[]; total: number; page: number; pageSize: 
 })
 const backupLoading = ref<string | null>(null)
 const usbLoading = ref(false)
+const restorePoints = ref<any[]>([])
+const restoreLoading = ref(false)
+const restoringPath = ref<string | null>(null)
+const showPreviewDialog = ref(false)
+const previewFiles = ref<{ name: string; size: number }[]>([])
 
 const loadBackupConfig = async () => {
   try {
@@ -555,12 +614,74 @@ const formatFileSize = (bytes: number) => {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
+const loadRestorePoints = async () => {
+  restoreLoading.value = true
+  try {
+    const res = await fetch(`${API_BASE}/restore-points`)
+    const result = await res.json()
+    if (result.success) restorePoints.value = result.data
+  } catch (e) {
+    console.error('加载还原点失败:', e)
+  } finally {
+    restoreLoading.value = false
+  }
+}
+
+const openPreviewDialog = async (backupPath: string) => {
+  try {
+    const res = await fetch(`${API_BASE}/preview?path=${encodeURIComponent(backupPath)}`)
+    const result = await res.json()
+    if (result.success) {
+      previewFiles.value = result.files
+      showPreviewDialog.value = true
+    } else {
+      ElMessage.error(result.message || '预览失败')
+    }
+  } catch {
+    ElMessage.error('预览请求失败')
+  }
+}
+
+const handleRestore = async (backupPath: string, timestamp: string) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要从备份 "${timestamp}" 恢复数据吗？当前数据将被覆盖。系统会在恢复前自动创建安全备份。`,
+      '确认数据还原',
+      { confirmButtonText: '确定还原', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+
+  restoringPath.value = backupPath
+  try {
+    const res = await fetch(`${API_BASE}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: backupPath }),
+    })
+    const result = await res.json()
+    if (result.success) {
+      ElMessage.success(result.message || '数据还原成功')
+      loadBackupHistory()
+      loadRestorePoints()
+    } else {
+      ElMessage.error(result.message || '数据还原失败')
+    }
+  } catch {
+    ElMessage.error('还原请求失败')
+  } finally {
+    restoringPath.value = null
+  }
+}
+
 // 切换到备份 tab 时加载数据
 watch(activeTab, (tab) => {
   if (tab === 'backup') {
     loadBackupConfig()
     refreshUsbDrives()
     loadBackupHistory()
+    loadRestorePoints()
   }
 })
 

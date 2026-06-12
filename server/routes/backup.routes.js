@@ -7,6 +7,9 @@ import {
   backupToUsb,
   backupToLocal,
   getStatus,
+  listRestorePoints,
+  previewBackup,
+  restoreFromBackup,
 } from '../services/backupService.js'
 
 const router = Router()
@@ -90,6 +93,52 @@ router.get('/history', (req, res) => {
 router.get('/status', (req, res) => {
   try {
     res.json({ success: true, data: getStatus() })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 列出所有可还原的备份点
+router.get('/restore-points', (req, res) => {
+  try {
+    const points = listRestorePoints()
+    res.json({ success: true, data: points })
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 预览备份内容
+router.get('/preview', (req, res) => {
+  try {
+    const { path: backupPath } = req.query
+    if (!backupPath) {
+      return res.status(400).json({ success: false, message: '缺少 path 参数' })
+    }
+    const result = previewBackup(backupPath)
+    if (result.success) {
+      res.json(result)
+    } else {
+      res.status(404).json(result)
+    }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message })
+  }
+})
+
+// 从备份还原数据
+router.post('/restore', async (req, res) => {
+  try {
+    const { path: backupPath } = req.body
+    if (!backupPath) {
+      return res.status(400).json({ success: false, message: '缺少 path 参数' })
+    }
+    const result = await restoreFromBackup(backupPath)
+    if (result.success) {
+      res.json(result)
+    } else {
+      res.status(500).json(result)
+    }
   } catch (e) {
     res.status(500).json({ success: false, message: e.message })
   }
