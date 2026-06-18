@@ -81,7 +81,9 @@ function scanDriveLetters() {
 /** 第二级：PowerShell 查询单个盘符的详细信息（仅在需要时调用） */
 function getDriveDetail(driveLetter) {
   try {
-    const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DeviceID -eq '${driveLetter}' } | Select-Object DeviceID, VolumeName, @{N='SizeGB';E={[math]::Round($_.Size/1GB,2)}}, @{N='FreeGB';E={[math]::Round($_.FreeSpace/1GB,2)}} | ConvertTo-Json"`
+    // PowerShell 返回的 DeviceID 不带尾部反斜杠（如 "E:"），需要统一格式
+    const cleanLetter = driveLetter.replace(/\\$/, '')
+    const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DriveType -eq 2 -and $_.DeviceID -eq '${cleanLetter}' } | Select-Object DeviceID, VolumeName, @{N='SizeGB';E={[math]::Round($_.Size/1GB,2)}}, @{N='FreeGB';E={[math]::Round($_.FreeSpace/1GB,2)}} | ConvertTo-Json"`
     const output = execSync(cmd, { encoding: 'utf-8', timeout: 5000, windowsHide: true }).trim()
     if (!output) return null
     const parsed = JSON.parse(output)
