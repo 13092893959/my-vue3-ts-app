@@ -30,6 +30,7 @@ export interface CardData {
   currentOrderRemark?: string
   currentOrderSnacks?: unknown[]
   timerSessions?: TimerSession[]
+  order?: number // 排序序号
   deferredOrders?: Array<{
     id: string
     sessionLabel: string

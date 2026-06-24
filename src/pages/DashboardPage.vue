@@ -11,8 +11,8 @@
 
       <div class="content-card">
         <div class="cards-area">
-          <div class="cards-grid">
-            <div v-for="card in cards" :key="card.id" class="card-col">
+          <div ref="cardsGridRef" class="cards-grid">
+            <div v-for="card in cards" :key="card.id" class="card-col" :data-card-id="card.id">
               <CardComponent
                 :card="card"
                 @start="startCardTimer"
@@ -115,9 +115,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue"
+import { ref, onMounted, onUnmounted, watch, nextTick } from "vue"
 import { useRouter } from "vue-router"
 import { ElMessage } from "element-plus"
+import Sortable from "sortablejs"
 import type { FormInstance } from "element-plus"
 // @ts-ignore: Vue component imports may not be typed correctly in this workspace
 import CardComponent from "../components/CardComponent.vue"
@@ -125,6 +126,8 @@ import CardComponent from "../components/CardComponent.vue"
 const router = useRouter()
 const STORAGE_KEY = "card-manager-cards"
 const cards = ref<any[]>([])
+const cardsGridRef = ref<HTMLElement | null>(null)
+let sortableInstance: Sortable | null = null
 const showForm = ref(false)
 const loading = ref(false)
 const isEditMode = ref(false) // 是否为编辑模式
@@ -259,6 +262,7 @@ const createDefaultCards = () => {
   const baseId = Date.now().toString().slice(-6)
   return Array.from({ length: 6 }, (_, index) => ({
     id: `F${baseId}${index}`,
+    order: index,
     status: "空闲",
     type: "大厅",
     entertainments: ["桌游"],
@@ -331,6 +335,7 @@ const submitForm = async () => {
 
           cards.value.push({
             id: formData.value.tableCode,
+            order: cards.value.length,
             status: "空闲",
             type: formData.value.type,
             entertainments: formData.value.entertainment,
@@ -1256,6 +1261,25 @@ const logout = () => {
 
 onMounted(async () => {
   await loadCards()
+  await nextTick()
+  if (cardsGridRef.value) {
+    sortableInstance = Sortable.create(cardsGridRef.value, {
+      animation: 200,
+      handle: '.card-col',
+      onEnd: () => {
+        const order = Array.from(cardsGridRef.value!.querySelectorAll('.card-col'))
+          .map((el) => (el as HTMLElement).dataset.cardId)
+        const cardMap = new Map(cards.value.map((c) => [c.id, c]))
+        cards.value = order.map((id) => cardMap.get(id)!).filter(Boolean)
+      },
+    })
+  }
+})
+onUnmounted(() => {
+  if (sortableInstance) {
+    sortableInstance.destroy()
+    sortableInstance = null
+  }
 })
 watch(cards, saveCards, { deep: true })
 </script>
