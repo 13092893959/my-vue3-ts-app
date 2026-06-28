@@ -30,32 +30,27 @@ app.use(cors())
 app.use(express.json())
 app.use(requestLogger)
 
-// 生产环境：提供前端静态文件
-const isProduction = process.env.NODE_ENV === 'production'
-if (isProduction) {
-  const frontendPath = path.join(__dirname, '..', 'dist')
-  if (fs.existsSync(frontendPath)) {
-    // 非 API 请求：先尝试匹配静态文件，找不到则返回 index.html（SPA 回退）
-    app.use((req, res, next) => {
-      if (req.path.startsWith('/api')) return next()
-      const filePath = path.join(frontendPath, req.path === '/' ? 'index.html' : req.path)
-      try {
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          const ext = path.extname(filePath).toLowerCase()
-          const mimeTypes = {
-            '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
-            '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
-            '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff': 'font/woff',
-            '.woff2': 'font/woff2',
-          }
-          res.type(mimeTypes[ext] || 'application/octet-stream').send(fs.readFileSync(filePath))
-          return
-        }
-      } catch {}
-      res.type('html').send(fs.readFileSync(path.join(frontendPath, 'index.html'), 'utf-8'))
-    })
-  }
-}
+// 提供前端静态文件
+const frontendPath = path.join(__dirname, 'dist')
+// 非 API 请求：先尝试匹配静态文件，找不到则返回 index.html（SPA 回退）
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) return next()
+  const filePath = path.join(frontendPath, req.path === '/' ? 'index.html' : req.path)
+  try {
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      const ext = path.extname(filePath).toLowerCase()
+      const mimeTypes = {
+        '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
+        '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg',
+        '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+      }
+      res.type(mimeTypes[ext] || 'application/octet-stream').send(fs.readFileSync(filePath))
+      return
+    }
+  } catch {}
+  res.type('html').send(fs.readFileSync(path.join(frontendPath, 'index.html'), 'utf-8'))
+})
 
 // 确保数据目录存在
 if (!fs.existsSync(DATA_DIR)) {
