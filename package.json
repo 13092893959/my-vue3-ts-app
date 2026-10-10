@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:deploy": "vite build --outDir deployment/backend/server/dist --emptyOutDir",
+    "build:deploy:full": "node scripts/deploy-full.mjs",
     "build:check": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "serve:api": "node server/index.js",
