@@ -14,28 +14,38 @@
     <template #header>
       <div class="card-header">
         <span class="card-code">{{ card.id }}</span>
-        <el-tag v-if="card.isDisabled" type="info" size="small" effect="light">
-          已禁用
-        </el-tag>
-        <el-tag
-          v-else-if="card.isInUse"
-          type="danger"
-          size="small"
-          effect="light"
-        >
-          使用中
-        </el-tag>
-        <el-tag
-          v-else-if="card.isBooked"
-          type="warning"
-          size="small"
-          effect="light"
-        >
-          已预约
-        </el-tag>
-        <el-tag v-else type="success" size="small" effect="light">
-          空桌
-        </el-tag>
+        <div class="card-header-right">
+          <el-tag v-if="card.isDisabled" type="info" size="small" effect="light">
+            已禁用
+          </el-tag>
+          <el-tag
+            v-else-if="card.isInUse"
+            type="danger"
+            size="small"
+            effect="light"
+          >
+            使用中
+          </el-tag>
+          <el-tag
+            v-else-if="card.isBooked"
+            type="warning"
+            size="small"
+            effect="light"
+          >
+            已预约
+          </el-tag>
+          <el-tag v-else type="success" size="small" effect="light">
+            空桌
+          </el-tag>
+          <el-button
+            type="danger"
+            size="small"
+            :icon="Delete"
+            circle
+            @click.stop="handleDelete"
+            title="删除桌台"
+          />
+        </div>
       </div>
     </template>
 
@@ -92,11 +102,33 @@
           v-for="session in card.timerSessions"
           :key="session.id"
           class="timer-session-row"
+          :class="{ paused: session.isPaused }"
         >
-          <span class="session-label">{{ session.label }}</span>
+          <span class="session-label">
+            {{ session.label }}
+            <el-tag v-if="session.isPaused" type="warning" size="small">已暂停</el-tag>
+          </span>
           <span class="session-time">{{
             formatTime(getSessionElapsed(session))
           }}</span>
+          <el-button
+            v-if="!session.isPaused"
+            size="small"
+            type="warning"
+            :icon="VideoPause"
+            circle
+            @click.stop="emit('pause', card.id, session.id)"
+            title="暂停此批次"
+          />
+          <el-button
+            v-else
+            size="small"
+            type="success"
+            :icon="VideoPlay"
+            circle
+            @click.stop="emit('resume', card.id, session.id)"
+            title="继续此批次"
+          />
         </div>
       </div>
       <!-- 向后兼容：无 timerSessions 时显示单计时器 -->
@@ -1603,9 +1635,11 @@ import {
   Bell,
   Lock,
   VideoPlay,
+  VideoPause,
   Document,
   Plus,
   Close,
+  Delete,
 } from "@element-plus/icons-vue"
 import BookingDialog from "./card/dialogs/BookingDialog.vue"
 import StartTimerDialog from "./card/dialogs/StartTimerDialog.vue"
@@ -1720,9 +1754,12 @@ const emit = defineEmits<{
   (e: "edit", id: string): void
   (e: "disable", id: string): void
   (e: "enable", id: string): void
+  (e: "delete", id: string): void
   (e: "settle-deferred", id: string): void
   (e: "update-remark", id: string, remark: string): void
   (e: "update-snacks", id: string, snacks: any[]): void
+  (e: "pause", id: string, sessionId: string): void
+  (e: "resume", id: string, sessionId: string): void
 }>()
 
 const remainingTime = ref(0)
@@ -1805,6 +1842,7 @@ const midSettleSelectedMember = ref<any>(null)
 const midSettleSnackAssignment = ref<Record<number, number>>({})
 const midSettleUsePerPerson = ref(false)
 const midSettlePerPersonAmount = ref(0)
+const midSettleManualPerPerson = ref(0)
 
 // 订单列表
 const tableOrders = ref<any[]>([])
@@ -1873,8 +1911,10 @@ const deferredOrderList = ref<any[]>([])
 // 按人均计算相关状态
 const usePerPersonCalc = ref(false)
 const perPersonAmount = ref(0)
+const manualPerPersonAmount = ref(0) // 用户手动输入的每人金额（不含套餐）
 const groupUsePerPerson = ref<Record<string, boolean>>({})
 const groupPerPersonAmounts = ref<Record<string, number>>({})
+const groupManualPerPersonAmounts = ref<Record<string, number>>({})
 
 // 获取当前零食数据（优先 local ref，fallback 到 prop）
 const getSnacks = () => {
@@ -1990,6 +2030,7 @@ const openMidSettleDialog = async () => {
   midSettleSnackAssignment.value = {}
   midSettleUsePerPerson.value = false
   midSettlePerPersonAmount.value = 0
+  midSettleManualPerPerson.value = 0
   await Promise.all([loadMembers(), loadPackages()])
   showMidSettleDialog.value = true
 }
@@ -2027,14 +2068,11 @@ const midSettleCalcPackages = () => {
     }
   })
   if (midSettleUsePerPerson.value) {
-    const manual = midSettlePerPersonAmount.value
-    const totalPerPerson = packagePerPerson + manual
+    const totalPerPerson = packagePerPerson + midSettleManualPerPerson.value
     midSettleForm.value.totalAmount = parseFloat(
       (totalPerPerson * midSettleForm.value.leavingUsers).toFixed(2),
     )
-    if (manual === 0 && packagePerPerson > 0) {
-      midSettlePerPersonAmount.value = parseFloat(packagePerPerson.toFixed(2))
-    }
+    midSettlePerPersonAmount.value = parseFloat(totalPerPerson.toFixed(2))
   } else {
     let total = 0
     midSettleForm.value.selectedPackageIds.forEach((pid) => {
@@ -2048,23 +2086,27 @@ const midSettleCalcPackages = () => {
 
 const onMidSettlePerPersonToggle = (val: boolean) => {
   if (val) {
-    midSettlePerPersonAmount.value =
-      midSettleForm.value.leavingUsers > 0
-        ? parseFloat(
-            (
-              midSettleForm.value.totalAmount / midSettleForm.value.leavingUsers
-            ).toFixed(2),
-          )
-        : 0
-    onMidSettlePerPersonAmountChange(midSettlePerPersonAmount.value)
+    const base = midSettleForm.value.leavingUsers > 0
+      ? parseFloat((midSettleForm.value.totalAmount / midSettleForm.value.leavingUsers).toFixed(2))
+      : 0
+    let pkgPerPerson = 0
+    midSettleForm.value.selectedPackageIds.forEach((id) => {
+      const p = availablePackages.value.find((x) => x.id === id)
+      if (p) pkgPerPerson += p.price
+    })
+    midSettleManualPerPerson.value = Math.max(0, base - pkgPerPerson)
+    midSettleCalcPackages()
   }
 }
 
 const onMidSettlePerPersonAmountChange = (val: number) => {
-  midSettleForm.value.totalAmount = parseFloat(
-    (val * midSettleForm.value.leavingUsers).toFixed(2),
-  )
-  midSettleCalcFinal()
+  let pkgPerPerson = 0
+  midSettleForm.value.selectedPackageIds.forEach((id) => {
+    const p = availablePackages.value.find((x) => x.id === id)
+    if (p) pkgPerPerson += p.price
+  })
+  midSettleManualPerPerson.value = Math.max(0, val - pkgPerPerson)
+  midSettleCalcPackages()
 }
 
 const midSettleCalcFinal = () => {
@@ -2112,8 +2154,12 @@ const confirmMidSettle = () => {
 }
 
 // 获取某个 session 的已过时间
-const getSessionElapsed = (session: { startTimestamp: number }) => {
+const getSessionElapsed = (session: { startTimestamp: number; isPaused?: boolean; pausedTimestamp?: number }) => {
   void timerTick.value // 建立响应式依赖，每秒重算
+  // 暂停时显示冻结时间，不继续走
+  if (session.isPaused && session.pausedTimestamp) {
+    return Math.max(0, Math.round((session.pausedTimestamp - session.startTimestamp) / 1000))
+  }
   return Math.max(0, Math.round((Date.now() - session.startTimestamp) / 1000))
 }
 
@@ -2354,6 +2400,32 @@ const handleEnable = async () => {
   }
 }
 
+const handleDelete = async () => {
+  const pending =
+    props.card.deferredOrders &&
+    props.card.deferredOrders.length > 0 &&
+    props.card.status === "待结"
+  if (props.card.isInUse || pending) {
+    ElMessage.warning("使用中的桌台无法删除，请先结束计时/结算挂账")
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除桌台 ${props.card.id} 吗？删除后不可恢复。`,
+      "确认删除",
+      {
+        confirmButtonText: "删除",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    )
+    emit("delete", props.card.id)
+    showDetailDialog.value = false
+  } catch {
+    // 用户取消
+  }
+}
+
 const formatTime = (seconds: number) => {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
@@ -2422,16 +2494,13 @@ const calculateTotalAmount = () => {
       packagePerPerson += usePerPersonCalc.value ? pkg.price : 0
     }
   })
-  const manual = usePerPersonCalc.value ? perPersonAmount.value : 0
-  const totalPerPerson = packagePerPerson + manual
   if (usePerPersonCalc.value) {
+    const totalPerPerson = packagePerPerson + manualPerPersonAmount.value
     settleForm.value.totalAmount = parseFloat(
       (totalPerPerson * props.card.currentUsers).toFixed(2),
     )
-    // 当仅选了套餐没有手动输入时，同步显示套餐人均价格
-    if (manual === 0 && packagePerPerson > 0) {
-      perPersonAmount.value = parseFloat(packagePerPerson.toFixed(2))
-    }
+    // 显示值 = 套餐人均 + 手动输入
+    perPersonAmount.value = parseFloat(totalPerPerson.toFixed(2))
   } else {
     let total = 0
     settleForm.value.selectedPackageIds.forEach((packageId) => {
@@ -2466,8 +2535,10 @@ const openSettleDialog = async () => {
   // 重置按人均计算状态
   usePerPersonCalc.value = false
   perPersonAmount.value = 0
+  manualPerPersonAmount.value = 0
   groupUsePerPerson.value = {}
   groupPerPersonAmounts.value = {}
+  groupManualPerPersonAmounts.value = {}
 
   // 每次打开都按当前 timerSessions 同步分组
   {
@@ -2695,15 +2766,11 @@ const updateGroupPackages = (groupId: string, packageIds: string[]) => {
     }
   })
   if (groupUsePerPerson.value[groupId]) {
-    const manual = groupPerPersonAmounts.value[groupId] || 0
-    const totalPerPerson = packagePerPerson + manual
+    const totalPerPerson = packagePerPerson + (groupManualPerPersonAmounts.value[groupId] || 0)
     group.totalAmount = parseFloat((totalPerPerson * group.users).toFixed(2))
-    // 仅选了套餐没手动输入时，同步显示套餐人均价格
-    if (manual === 0 && packagePerPerson > 0) {
-      groupPerPersonAmounts.value = {
-        ...groupPerPersonAmounts.value,
-        [groupId]: parseFloat(packagePerPerson.toFixed(2)),
-      }
+    groupPerPersonAmounts.value = {
+      ...groupPerPersonAmounts.value,
+      [groupId]: parseFloat(totalPerPerson.toFixed(2)),
     }
   } else {
     let total = 0
@@ -2778,49 +2845,65 @@ const updateGroupPayment = (groupId: string, method: string) => {
 // ---- 按人均计算 ----
 const onPerPersonToggle = (val: boolean) => {
   if (val) {
-    perPersonAmount.value =
-      props.card.currentUsers > 0
-        ? parseFloat(
-            (settleForm.value.totalAmount / props.card.currentUsers).toFixed(2),
-          )
-        : 0
-    onPerPersonAmountChange(perPersonAmount.value)
+    // 从当前总金额反推人均
+    const base = props.card.currentUsers > 0
+      ? parseFloat((settleForm.value.totalAmount / props.card.currentUsers).toFixed(2))
+      : 0
+    // 减去套餐部分，得到手动输入部分
+    let pkgPerPerson = 0
+    settleForm.value.selectedPackageIds.forEach((id) => {
+      const p = availablePackages.value.find((x) => x.id === id)
+      if (p) pkgPerPerson += p.price
+    })
+    manualPerPersonAmount.value = Math.max(0, base - pkgPerPerson)
+    calculateTotalAmount()
   }
 }
 
 const onPerPersonAmountChange = (val: number) => {
-  // perPersonAmount 是总人均价格，直接乘人数得总金额
-  settleForm.value.totalAmount = parseFloat(
-    (val * props.card.currentUsers).toFixed(2),
-  )
-  calculateFinalAmount()
+  // 用户设置了总人均金额，减去套餐部分得到手动输入部分
+  let pkgPerPerson = 0
+  settleForm.value.selectedPackageIds.forEach((id) => {
+    const p = availablePackages.value.find((x) => x.id === id)
+    if (p) pkgPerPerson += p.price
+  })
+  manualPerPersonAmount.value = Math.max(0, val - pkgPerPerson)
+  calculateTotalAmount()
 }
 
 const onGroupPerPersonToggle = (groupId: string, val: boolean) => {
   groupUsePerPerson.value = { ...groupUsePerPerson.value, [groupId]: val }
   const group = settleGroups.value.find((g) => g.id === groupId)
   if (val && group) {
-    groupPerPersonAmounts.value = {
-      ...groupPerPersonAmounts.value,
-      [groupId]:
-        group.users > 0
-          ? parseFloat((group.totalAmount / group.users).toFixed(2))
-          : 0,
+    const base = group.users > 0
+      ? parseFloat((group.totalAmount / group.users).toFixed(2))
+      : 0
+    let pkgPerPerson = 0
+    group.selectedPackageIds.forEach((id) => {
+      const p = availablePackages.value.find((x) => x.id === id)
+      if (p) pkgPerPerson += p.price
+    })
+    groupManualPerPersonAmounts.value = {
+      ...groupManualPerPersonAmounts.value,
+      [groupId]: Math.max(0, base - pkgPerPerson),
     }
-    onGroupPerPersonAmountChange(groupId, groupPerPersonAmounts.value[groupId])
+    updateGroupPackages(groupId, group.selectedPackageIds)
   }
 }
 
 const onGroupPerPersonAmountChange = (groupId: string, val: number) => {
   const group = settleGroups.value.find((g) => g.id === groupId)
   if (!group) return
-  groupPerPersonAmounts.value = {
-    ...groupPerPersonAmounts.value,
-    [groupId]: val,
+  let pkgPerPerson = 0
+  group.selectedPackageIds.forEach((id) => {
+    const p = availablePackages.value.find((x) => x.id === id)
+    if (p) pkgPerPerson += p.price
+  })
+  groupManualPerPersonAmounts.value = {
+    ...groupManualPerPersonAmounts.value,
+    [groupId]: Math.max(0, val - pkgPerPerson),
   }
-  // perPersonAmount 是总人均价格，直接乘人数
-  group.totalAmount = parseFloat((val * group.users).toFixed(2))
-  calcGroupFinal(group)
+  updateGroupPackages(groupId, group.selectedPackageIds)
 }
 
 const assignSnackToGroup = (
@@ -2952,6 +3035,12 @@ onUnmounted(() => {
   font-size: 24px;
   font-weight: 800;
   color: #303133;
+}
+
+.card-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .disabled-overlay {

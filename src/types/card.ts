@@ -4,6 +4,8 @@ export interface TimerSession {
   users: number
   startTimestamp: number
   label: string
+  isPaused?: boolean
+  pausedTimestamp?: number
 }
 
 /** 桌台卡片完整数据结构 */

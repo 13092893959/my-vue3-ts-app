@@ -27,9 +27,12 @@
                 @edit="editCard"
                 @disable="disableCard"
                 @enable="enableCard"
+                @delete="deleteCard"
                 @update-remark="updateCardRemark"
                 @update-snacks="updateCardSnacks"
                 @settle-deferred="settleCardDeferred"
+                @pause="pauseCardTimer"
+                @resume="resumeCardTimer"
               />
             </div>
           </div>
@@ -392,6 +395,11 @@ const removeCard = (id: string) => {
   cards.value = cards.value.filter((card) => card.id !== id)
 }
 
+const deleteCard = (id: string) => {
+  removeCard(id)
+  ElMessage.success(`已删除桌台 ${id}`)
+}
+
 const startCardTimer = (
   id: string,
   data: { entertainment: string; currentUsers: number; startTimestamp: number },
@@ -417,6 +425,30 @@ const startCardTimer = (
     ElMessage.success(
       `卡片 ${id} 开始计时，娱乐类型：${data.entertainment}，人数：${data.currentUsers}`,
     )
+  }
+}
+
+const pauseCardTimer = (id: string, sessionId: string) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (!card?.timerSessions) return
+  const session = card.timerSessions.find((s) => s.id === sessionId)
+  if (session && !session.isPaused) {
+    session.isPaused = true
+    session.pausedTimestamp = Date.now()
+    saveCards()
+  }
+}
+
+const resumeCardTimer = (id: string, sessionId: string) => {
+  const card = cards.value.find((c) => c.id === id)
+  if (!card?.timerSessions) return
+  const session = card.timerSessions.find((s) => s.id === sessionId)
+  if (session && session.isPaused && session.pausedTimestamp) {
+    const gap = Date.now() - session.pausedTimestamp
+    session.startTimestamp += gap
+    session.isPaused = false
+    session.pausedTimestamp = undefined
+    saveCards()
   }
 }
 
